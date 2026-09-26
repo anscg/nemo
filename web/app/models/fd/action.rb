@@ -9,10 +9,14 @@ module Fd
     NEEDS_CHANNEL = TABLE.select { |_key, row| row["channel"] == "required" }.keys.freeze
     TAKES_CHANNEL = TABLE.select { |_key, row| row["channel"].present? }.keys.freeze
     WORST_FIRST = TABLE.sort_by { |_key, row| row.fetch("weight") }.map(&:first).freeze
+    ENFORCE = TABLE.transform_values { |row| row["enforce"] }.compact.freeze
+    ENFORCEABLE = ENFORCE.keys.freeze
 
     belongs_to :kase, class_name: "Fd::Case", foreign_key: :case_id, inverse_of: :actions
     belongs_to :cited_message, class_name: "Fd::ThreadMessage",
       foreign_key: :cites_message_id, optional: true
+    belongs_to :guard, class_name: "Fd::MemberGuard", foreign_key: :guard_id,
+      optional: true, inverse_of: :actions
 
     scope :live, -> { where(reversed_at: nil) }
     scope :reversed, -> { where.not(reversed_at: nil) }
@@ -22,9 +26,17 @@ module Fd
     scope :expiring, -> { live.where.not(expires_at: nil) }
     scope :in_force, ->(at = Time.current) { live.where("expires_at > ?", at) }
 
+    def self.guard_kind(type_key) = ENFORCE.dig(type_key, "guard")
+
+    def self.guard_scope(type_key) = ENFORCE.dig(type_key, "scope")
+
+    def self.enforceable?(type_key) = ENFORCE.key?(type_key)
+
     def reversed?
       reversed_at.present?
     end
+
+    def enforceable? = self.class.enforceable?(type_key)
 
     def cites?
       cites_message_id.present?

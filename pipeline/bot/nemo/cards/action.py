@@ -33,6 +33,22 @@ def needs_expiry(key):
     return bool(table().get(key, {}).get("expires"))
 
 
+def enforce(key):
+    return table().get(key, {}).get("enforce") or {}
+
+
+def guard_kind(key):
+    return enforce(key).get("guard")
+
+
+def guard_scope(key):
+    return enforce(key).get("scope")
+
+
+def guard_carry(key):
+    return enforce(key).get("carry")
+
+
 def needs_channel(key):
     return table().get(key, {}).get("channel") == "required"
 
