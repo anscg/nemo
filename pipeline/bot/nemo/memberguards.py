@@ -64,6 +64,21 @@ def for_action(conn, type_key, subject_id, channel_id=None):
     return standing(conn, subject_id, kind, channel_id)
 
 
+def settle(conn, type_key, subject_id, case_id=None, channel_id=None):
+    if not enforceable(type_key):
+        return {"enforceable": False, "found": None, "reads": UNGUARDED, "case_id": case_id}
+    if not subject_id:
+        return {"enforceable": True, "found": None, "reads": UNGUARDED, "case_id": case_id}
+
+    found = for_action(conn, type_key, subject_id, channel_id)
+    return {
+        "enforceable": True,
+        "found": found,
+        "reads": reads(found, case_id),
+        "case_id": case_id,
+    }
+
+
 def reads(found, case_id=None):
     if found is None:
         return UNGUARDED

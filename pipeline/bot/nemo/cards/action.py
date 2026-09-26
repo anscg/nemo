@@ -11,6 +11,7 @@ UNTIL = "action_until"
 WHERE = "action_where"
 REASON = "action_reason"
 CATEGORY = "action_category"
+STANDING = "action_standing"
 
 REASON_LIMIT = 2000
 
@@ -78,6 +79,64 @@ def kind_pick(held):
     return {"initial_option": picked[0]} if picked else {}
 
 
+def when(at):
+    return at.strftime("%-d %b") if at else None
+
+
+def already(found):
+    said = label(found["kind"]).lower()
+    where = found.get("channel_id")
+    return f"{said} in <#{where}>" if where else said
+
+
+def whose(found, case_id):
+    held = found.get("case_id")
+    if held is None:
+        return "on no case"
+    if case_id is not None and held == case_id:
+        return "on this case"
+    return f"under *case {held}*"
+
+
+def footnote(found):
+    said = [f"opened by <@{found['opened_by']}>"]
+    since = when(found.get("opened_at"))
+    if since:
+        said.append(f"since {since}")
+    until = when(found.get("expires_at"))
+    said.append(f"until {until}" if until else "with no end date")
+    if found.get("carried_by") == "by_hand":
+        said.append("done by hand")
+    elif found.get("carry") == "failed":
+        said.append("nemo is not holding it")
+    elif found.get("carry") == "pending":
+        said.append("nemo has not carried it yet")
+    return "  ·  ".join(said)
+
+
+def standing_blocks(standing):
+    found = (standing or {}).get("found")
+    if not found:
+        return []
+
+    return [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": ":warning: <@{}> is already {} {}.".format(
+                    found["subject_id"], already(found), whose(found, standing.get("case_id"))
+                ),
+            },
+        },
+        {
+            "type": "context",
+            "block_id": STANDING,
+            "elements": [{"type": "mrkdwn", "text": footnote(found)}],
+        },
+    ]
+
+
 def opening(subjects=(), category=None):
     return {
         "target_user_id": subjects[0] if subjects else None,
@@ -85,7 +144,7 @@ def opening(subjects=(), category=None):
     }
 
 
-def blocks(case_id, said):
+def blocks(case_id, said, standing=None):
     key = said.get("type_key")
     built = [
         {
@@ -95,6 +154,7 @@ def blocks(case_id, said):
         {
             "type": "input",
             "block_id": TARGET,
+            "dispatch_action": True,
             "label": {"type": "plain_text", "text": "Against"},
             "element": {
                 "type": "users_select",
@@ -122,6 +182,8 @@ def blocks(case_id, said):
         },
     ]
 
+    built += standing_blocks(standing)
+
     if needs_expiry(key):
         built.append(
             {
@@ -145,6 +207,7 @@ def blocks(case_id, said):
             {
                 "type": "input",
                 "block_id": WHERE,
+                "dispatch_action": True,
                 "optional": not needs_channel(key),
                 "label": {"type": "plain_text", "text": "Which channel"},
                 "element": {
@@ -191,7 +254,7 @@ def blocks(case_id, said):
     return built
 
 
-def view(case_id, subjects=(), category=None, said=None):
+def view(case_id, subjects=(), category=None, said=None, standing=None):
     return {
         "type": "modal",
         "callback_id": CALLBACK,
@@ -199,15 +262,17 @@ def view(case_id, subjects=(), category=None, said=None):
         "title": {"type": "plain_text", "text": "Log an action"},
         "submit": {"type": "plain_text", "text": "Log it"},
         "close": {"type": "plain_text", "text": "Cancel"},
-        "blocks": blocks(case_id, said or opening(subjects, category)),
+        "blocks": blocks(case_id, said or opening(subjects, category), standing),
     }
 
 
-def unasked(said, shown):
+def unasked(said, shown, standing=None):
     key = said.get("type_key")
     if needs_expiry(key) and UNTIL not in shown:
         return True
-    return needs_channel(key) and WHERE not in shown
+    if needs_channel(key) and WHERE not in shown:
+        return True
+    return bool((standing or {}).get("found")) and STANDING not in shown
 
 
 def picked(view_state):

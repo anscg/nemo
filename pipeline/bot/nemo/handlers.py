@@ -1,7 +1,7 @@
 import logging
 
 from bot.core import access, session
-from bot.nemo import answer, cards, chat, surface
+from bot.nemo import answer, cards, chat, memberguards, surface
 from bot.nemo.casework import (
     CASE_CATEGORY,
     HELD_BY,
@@ -73,8 +73,16 @@ def register(app, on_reply=None):
             view=cards.action.view(case_id, subjects, held[0] if held else None),
         )
 
-    @app.action(cards.action.KIND)
-    def on_action_kind(ack, body, client):
+    def settle(conn, case_id, said):
+        return memberguards.settle(
+            conn,
+            said.get("type_key"),
+            said.get("target_user_id"),
+            case_id,
+            said.get("channel_id"),
+        )
+
+    def reshape(ack, body, client):
         ack()
         asked = body.get("view") or {}
         if asked.get("callback_id") != cards.action.CALLBACK:
@@ -82,14 +90,20 @@ def register(app, on_reply=None):
 
         case_id = int(asked["private_metadata"])
         said = cards.action.picked(asked["state"])
+        with session() as conn:
+            standing = settle(conn, case_id, said)
+
         try:
             client.views_update(
                 view_id=asked["id"],
                 hash=asked["hash"],
-                view=cards.action.view(case_id, said=said),
+                view=cards.action.view(case_id, said=said, standing=standing),
             )
         except Exception as failure:
             log.warning("nemo: could not reshape the action modal: %s", failure)
+
+    for where in (cards.action.KIND, cards.action.TARGET, cards.action.WHERE):
+        app.action(where)(reshape)
 
     @app.view(cards.action.CALLBACK)
     def on_action_logged(ack, body, view, client):
@@ -97,11 +111,14 @@ def register(app, on_reply=None):
         user_id = body["user"]["id"]
         said = cards.action.picked(view["state"])
 
+        with session() as conn:
+            standing = settle(conn, case_id, said)
+
         shown = {block.get("block_id") for block in view.get("blocks", [])}
-        if cards.action.unasked(said, shown):
+        if cards.action.unasked(said, shown, standing):
             return ack(
                 response_action="update",
-                view=cards.action.view(case_id, said=said),
+                view=cards.action.view(case_id, said=said, standing=standing),
             )
 
         wrong = cards.action.objection(said)
