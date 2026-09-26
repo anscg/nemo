@@ -515,6 +515,7 @@
     gap: var(--s-2xs);
     min-width: 0;
   }
+  .pick > span:empty, .pick-field > span:empty { display: none; }
   .pick-body { display: flex; flex-direction: column; gap: var(--s-2xs); min-width: 0; }
   .pick-field {
     position: relative;
@@ -523,6 +524,8 @@
     gap: 6px;
     padding: 0 10px;
   }
+  .pick-field:has(.token-plain) { height: auto; padding-block: 5px; }
+  .pick-field:has(.token-plain) .pick-input { height: 22px; }
   .pick-field .pick-input {
     width: 100%;
     height: calc(var(--ctl-h) - 2px);

@@ -169,8 +169,8 @@ def settle_options(said, standing):
     reads = standing.get("reads") or UNGUARDED
     if reads == UNGUARDED:
         return [
-            (CARRY, "Nemo carries it out"),
-            (BY_HAND, "It is already done, just record it"),
+            (CARRY, "Take action"),
+            (BY_HAND, "Already taken (records only)"),
         ]
     if reads == ORPHANED:
         return [

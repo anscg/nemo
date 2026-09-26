@@ -14,9 +14,21 @@ module Fd
 
       @endings = Case.ending_tally
       @closed_count = Case.where.not(resolved_at: nil).count
+
+      @guards = worst_first(MemberGuard.still_on.to_a)
+      @orphaned = @guards.count(&:orphaned?)
+      @names = Names.for(@guards.flat_map(&:people_named) + @guards.map(&:subject_id))
     end
 
     private
+
+    WEIGHT = Action::WORST_FIRST
+
+    def worst_first(guards)
+      guards.sort_by do |guard|
+        [WEIGHT.index(guard.kind) || WEIGHT.size, -guard.opened_at.to_i]
+      end
+    end
 
     def median_resolve_lag
       lags = Case.not_duplicate

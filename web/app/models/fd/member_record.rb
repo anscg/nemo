@@ -38,6 +38,10 @@ module Fd
       @actions ||= Action.for_target(user_id).to_a
     end
 
+    def guards
+      @guards ||= MemberGuard.still_on.for_subject(user_id).oldest_first.to_a
+    end
+
     def notes
       @notes ||= Note.for_subject(user_id).visible.recent_first.to_a
     end

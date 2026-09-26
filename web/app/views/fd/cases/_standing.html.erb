@@ -11,14 +11,16 @@
   <% end %>
   <% options = settle_options(standing, type_key) %>
   <% if options.any? %>
-    <fieldset class="field-label settle">
-      <legend>Enforcement</legend>
-      <% options.each do |value, said| %>
-        <label class="settle-pick">
-          <%= radio_button_tag :settle, value, value == settle_default(standing), id: nil %>
-          <span><%= said %></span>
-        </label>
-      <% end %>
-    </fieldset>
+    <div class="field-label">
+      <span>Enforcement</span>
+      <div class="segmented seg-radio">
+        <% options.each do |value, said| %>
+          <label>
+            <%= radio_button_tag :settle, value, value == settle_default(standing), id: nil %>
+            <%= said %>
+          </label>
+        <% end %>
+      </div>
+    </div>
   <% end %>
 <% end %>

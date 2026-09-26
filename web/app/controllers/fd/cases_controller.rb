@@ -26,6 +26,7 @@ module Fd
       @reports = CaseReport.where(case_id: family).oldest_first.to_a
       @actions = Action.where(case_id: family).oldest_first.to_a
       @live_actions = @actions.reject(&:reversed?)
+      @thread_guards = ThreadGuard.for_case(family).newest_first.to_a
       @siblings = @case.sibling_cases.includes(:subjects).oldest_first.to_a
       @duplicate_candidates = Case.candidates_for(@case, @siblings)
       @notes = Note.where(case_id: family).visible.recent_first.to_a

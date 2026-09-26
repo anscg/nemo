@@ -1388,8 +1388,38 @@ module FdHelper
     end
   end
 
+  THREAD_GUARD_STATE = {
+    "warned" => ["warned", "state-warn"],
+    "running" => ["running", "state-warn"],
+    "done" => ["done", "state-good"],
+    "failed" => ["failed", "state-crit"]
+  }.freeze
+
+  def thread_guard_line(guard)
+    said = guard.destroying? ? "Thread destroyed" : "Thread locked"
+    safe_join([said, " in ", channel_link(guard.channel_id)])
+  end
+
+  def thread_guard_chip(guard)
+    said, tone = THREAD_GUARD_STATE.fetch(guard.state, [guard.state, "state"])
+    tag.span(said, class: "state #{tone}")
+  end
+
   def guard_kind_options
     Fd::MemberGuard::KINDS.map { |key| [ACTION_LABELS.fetch(key, key), key] }
+  end
+
+  GUARD_CARRY_CHIP = {
+    "held" => ["holding", "state-good"],
+    "pending" => ["not yet", "state-warn"],
+    "failed" => ["not holding", "state-crit"]
+  }.freeze
+
+  def guard_carry_chip(guard)
+    return tag.span("by hand", class: "state") if guard.by_hand?
+
+    said, tone = GUARD_CARRY_CHIP.fetch(guard.carry, [guard.carry, "state"])
+    tag.span(said, class: "state #{tone}")
   end
 
   def guard_held_line(guard)
@@ -1454,8 +1484,8 @@ module FdHelper
 
     case standing.reads
     when Fd::MemberGuard::UNGUARDED
-      [[Fd::MemberGuard::CARRY, "Nemo carries it out"],
-       [Fd::MemberGuard::ALREADY_DONE, "It is already done, just record it"]]
+      [[Fd::MemberGuard::CARRY, "Take action"],
+       [Fd::MemberGuard::ALREADY_DONE, "Already taken (records only)"]]
     when Fd::MemberGuard::ORPHANED
       [[Fd::MemberGuard::ADOPT, "Attach it to this case"],
        [Fd::MemberGuard::RECORD, "Leave it where it is, just record this"]]

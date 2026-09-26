@@ -18,14 +18,17 @@ module Fd
       acted AS (
         SELECT target_user_id AS user_id,
                count(*) AS actions,
-               count(*) FILTER (
-                 WHERE reversed_at IS NULL AND expires_at > :now
-               ) AS in_force,
                count(DISTINCT case_id) FILTER (
                  WHERE reversed_at IS NULL AND performed_at >= :prior_since
                ) AS priors
         FROM fd.actions
         GROUP BY target_user_id
+      ),
+      held AS (
+        SELECT subject_id AS user_id, count(*) AS in_force
+        FROM fd.member_guards
+        WHERE state IN ('live', 'lifting')
+        GROUP BY subject_id
       ),
       noted AS (
         SELECT subject_user_id AS user_id, count(*) AS notes
@@ -37,6 +40,7 @@ module Fd
         SELECT user_id FROM fd.member WHERE is_deleted = false AND is_bot = false
         UNION SELECT user_id FROM conduct
         UNION SELECT user_id FROM acted
+        UNION SELECT user_id FROM held
         UNION SELECT user_id FROM noted
       ),
       roster AS (
@@ -47,13 +51,14 @@ module Fd
                coalesce(conduct.open_cases, 0) AS open_cases,
                conduct.last_case_at,
                coalesce(acted.actions, 0) AS actions,
-               coalesce(acted.in_force, 0) AS in_force,
+               coalesce(held.in_force, 0) AS in_force,
                coalesce(acted.priors, 0) AS priors,
                coalesce(noted.notes, 0) AS notes,
                m.display_name, m.handle
         FROM people
         LEFT JOIN conduct ON conduct.user_id = people.user_id
         LEFT JOIN acted ON acted.user_id = people.user_id
+        LEFT JOIN held ON held.user_id = people.user_id
         LEFT JOIN noted ON noted.user_id = people.user_id
         LEFT JOIN fd.member m ON m.user_id = people.user_id
         CONTEXT_JOIN
@@ -85,15 +90,18 @@ module Fd
       acted AS (
         SELECT target_user_id AS user_id,
                count(*) AS actions,
-               count(*) FILTER (
-                 WHERE reversed_at IS NULL AND expires_at > :now
-               ) AS in_force,
                count(DISTINCT case_id) FILTER (
                  WHERE reversed_at IS NULL AND performed_at >= :prior_since
                ) AS priors
         FROM fd.actions
         WHERE target_user_id IN (SELECT user_id FROM hit)
         GROUP BY target_user_id
+      ),
+      held AS (
+        SELECT subject_id AS user_id, count(*) AS in_force
+        FROM fd.member_guards
+        WHERE state IN ('live', 'lifting') AND subject_id IN (SELECT user_id FROM hit)
+        GROUP BY subject_id
       ),
       noted AS (
         SELECT subject_user_id AS user_id, count(*) AS notes
@@ -110,13 +118,14 @@ module Fd
                coalesce(conduct.open_cases, 0) AS open_cases,
                conduct.last_case_at,
                coalesce(acted.actions, 0) AS actions,
-               coalesce(acted.in_force, 0) AS in_force,
+               coalesce(held.in_force, 0) AS in_force,
                coalesce(acted.priors, 0) AS priors,
                coalesce(noted.notes, 0) AS notes,
                m.display_name, m.handle
         FROM people
         LEFT JOIN conduct ON conduct.user_id = people.user_id
         LEFT JOIN acted ON acted.user_id = people.user_id
+        LEFT JOIN held ON held.user_id = people.user_id
         LEFT JOIN noted ON noted.user_id = people.user_id
         LEFT JOIN fd.member m ON m.user_id = people.user_id
         LEFT JOIN analytics.dim_member_cohort dm ON dm.user_id = people.user_id

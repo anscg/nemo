@@ -79,24 +79,25 @@ class FdMembersListTest < ActionDispatch::IntegrationTest
       "reporting the case you are the subject of does not make it two cases"
   end
 
-  test "the in force view keeps only people with something still running" do
-    live = make_case(subject: "ULIVE", opened_at: 9.days.ago)
-    act_on live, target: "ULIVE", type_key: "shush", expires_at: 5.days.from_now
+  def hold(subject, **over)
+    Fd::MemberGuard.create!({ kind: "shush", subject_id: subject, opened_by: "UME",
+                              reason: "being awful",
+                              expires_at: 5.days.from_now }.merge(over))
+  end
 
-    lapsed = make_case(subject: "ULAPSED", opened_at: 40.days.ago)
-    act_on lapsed, target: "ULAPSED", type_key: "shush", expires_at: 1.day.ago
+  test "the in force view keeps only people something is being held on" do
+    hold "ULIVE"
+    hold "UENDLESS", expires_at: nil
+    hold "ULIFTED", state: "lifted", lifted_at: 1.day.ago, lifted_by: "UME"
 
-    warned = make_case(subject: "UWARNED", opened_at: 9.days.ago)
-    act_on warned, target: "UWARNED", type_key: "warning"
-
-    lifted = make_case(subject: "ULIFTED", opened_at: 9.days.ago)
-    act_on lifted, target: "ULIFTED", type_key: "shush", expires_at: 5.days.from_now,
-      reversed_at: 1.day.ago, reversed_by: "UME", reversal_reason: "appeal upheld"
+    logged = make_case(subject: "ULOGGED", opened_at: 9.days.ago)
+    act_on logged, target: "ULOGGED", type_key: "shush", expires_at: 5.days.from_now
 
     assert listed?("ULIVE", view: "force")
-    assert_not listed?("ULAPSED", view: "force"), "its due date has passed"
-    assert_not listed?("UWARNED", view: "force"), "a warning has no due date to reach"
-    assert_not listed?("ULIFTED", view: "force"), "it was reversed"
+    assert listed?("UENDLESS", view: "force"), "no end date does not mean not in force"
+    assert_not listed?("ULIFTED", view: "force"), "it was lifted"
+    assert_not listed?("ULOGGED", view: "force"),
+      "an action on its own holds nothing in Slack"
   end
 
   test "the open case view keeps only people with one open" do

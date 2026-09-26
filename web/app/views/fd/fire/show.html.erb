@@ -22,11 +22,29 @@
     <span class="metric-say"><span>from when the report arrived</span></span>
   </div>
   <div class="metric">
+    <span class="metric-k">In force</span>
+    <span class="metric-v"><%= @guards.size %></span>
+    <span class="metric-say">
+      <% if @guards.empty? %>
+        <span>nothing is being held on anybody</span>
+      <% elsif @orphaned.positive? %>
+        <span class="delta-down"><%= @orphaned %></span>
+        <span>attached to no case</span>
+      <% else %>
+        <span>all of it attached to a case</span>
+      <% end %>
+    </span>
+  </div>
+  <div class="metric">
     <span class="metric-k">Actions, 30 days</span>
     <span class="metric-v"><%= @actions_total %></span>
     <span class="metric-say"><span><%= @reversed %> later reversed</span></span>
   </div>
 </div>
+
+<% if @guards.any? %>
+  <%= render "in_force", guards: @guards, names: @names %>
+<% end %>
 
 <% if @endings.any? %>
   <%= render "endings", endings: @endings, closed: @closed_count %>

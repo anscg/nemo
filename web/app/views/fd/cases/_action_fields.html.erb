@@ -28,8 +28,7 @@
 </label>
 <label class="field-label">
   Why
-  <%= text_area_tag :reason, field_was(:reason), rows: 3, class: "textarea", id: nil,
-        placeholder: "what they did, and why this is the answer to it" %>
+  <%= text_area_tag :reason, field_was(:reason), rows: 3, class: "textarea", id: nil %>
 </label>
 <%= field_wrong(:reason) %>
 <% if flagged.any? %>

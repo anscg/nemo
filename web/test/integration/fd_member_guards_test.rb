@@ -143,4 +143,30 @@ class FdMemberGuardsTest < ActionDispatch::IntegrationTest
     assert_match(/guard-lift-#{guard.id}/, response.body)
     assert_match(/on no case/, response.body)
   end
+  test "the modal uses the house dropdown and hides the channel until it is wanted" do
+    get fd_member_path("USUB")
+
+    assert_match(/data-controller="picker menu"/, response.body)
+    assert_match(/segmented seg-radio/, response.body)
+    assert_match(/data-guard-form-target="channel" hidden/, response.body)
+    assert_match(/data-controller="channel-picker"/, response.body)
+  end
+
+  test "the enforcement choice is worded the same on both surfaces" do
+    get fd_member_path("USUB")
+    assert_match(/Take action/, response.body)
+    assert_match(/Already taken \(records only\)/, response.body)
+  end
+
+  test "channels can be searched from inside the fire engine" do
+    get fd_channel_search_path, params: { q: "" }
+    assert_response :success
+    assert_kind_of Array, response.parsed_body["channels"]
+  end
+
+  test "a signed out visitor cannot search channels" do
+    delete logout_path
+    get fd_channel_search_path, params: { q: "" }
+    assert_redirected_to login_path
+  end
 end

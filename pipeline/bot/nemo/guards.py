@@ -65,6 +65,12 @@ SET state = %s, finished_at = now(), error = %s, transcript_sha = coalesce(%s, t
 WHERE id = %s
 """
 
+ON_A_CASE = """
+SELECT case_id FROM fd.case_threads
+WHERE channel_id = %s AND thread_ts = %s
+ORDER BY is_primary DESC, added_at LIMIT 1
+"""
+
 PENDING = """
 SELECT id FROM fd.thread_guards
 WHERE kind = 'destroy' AND state IN ('warned', 'running')
@@ -174,7 +180,15 @@ def by_id(conn, guard_id):
     return conn.execute(BY_ID, (guard_id,)).fetchone()
 
 
+def case_of(conn, channel_id, thread_ts):
+    row = conn.execute(ON_A_CASE, (channel_id, thread_ts)).fetchone()
+    return row[0] if row else None
+
+
 def open_guard(conn, kind, channel_id, thread_ts, by, reason, expires_at=None, case_id=None):
+    if case_id is None:
+        case_id = case_of(conn, channel_id, thread_ts)
+
     row = conn.execute(
         OPEN, (kind, channel_id, thread_ts, by, reason, expires_at, case_id)
     ).fetchone()
@@ -185,7 +199,8 @@ def open_guard(conn, kind, channel_id, thread_ts, by, reason, expires_at=None, c
     audit.record(
         conn, "thread_guard", guard_id, "opened", by,
         after={"kind": kind, "channel_id": channel_id, "thread_ts": thread_ts,
-               "reason": reason, "expires_at": str(expires_at) if expires_at else None},
+               "case_id": case_id, "reason": reason,
+               "expires_at": str(expires_at) if expires_at else None},
     )
     return guard_id
 

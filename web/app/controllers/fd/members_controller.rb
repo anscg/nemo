@@ -31,7 +31,7 @@ module Fd
       @context = MemberContext.for([@user_id])[@user_id]
       @rooms = SlackScan.channels(@user_id)
       @standing = MemberStanding.new(@record)
-      @guards = MemberGuard.still_on.for_subject(@user_id).oldest_first.to_a
+      @guards = @standing.in_force
       @member_grant = @pane_grants[@user_id] || Authz::Grant.live.roles.find_by(user_id: @user_id)
     end
 
@@ -77,7 +77,7 @@ module Fd
       @context = MemberContext.for([@user_id])[@user_id]
       @rooms = SlackScan.channels(@user_id)
       @standing = MemberStanding.new(@record)
-      @guards = MemberGuard.still_on.for_subject(@user_id).oldest_first.to_a
+      @guards = @standing.in_force
       render "drawer"
     end
 

@@ -12,6 +12,7 @@ export default class extends Controller {
   static values = { name: String, url: String, submit: Boolean }
 
   connect() {
+    this.blank = this.inputTarget.placeholder
     this.timer = null
     this.asked = 0
     this.picked = null
@@ -60,6 +61,7 @@ export default class extends Controller {
   }
 
   show(channels) {
+    this.resultsTarget.hidden = false
     this.resultsTarget.innerHTML = ""
     if (channels.length === 0) {
       this.resultsTarget.append(said("pick-none", "no channel matches"))
@@ -117,7 +119,9 @@ export default class extends Controller {
 
   take(id, name) {
     this.picked = { id, name }
+    this.inputTarget.value = ""
     this.render()
+    this.clearResults()
     const flip = this.element.querySelector(".modal-flip")
     if (flip) {
       flip.checked = false
@@ -136,12 +140,27 @@ export default class extends Controller {
   render() {
     this.storeTarget.innerHTML = ""
     this.chosenTarget.innerHTML = ""
-    if (!this.picked) return
+    if (!this.picked) {
+      this.inputTarget.placeholder = this.blank
+      return
+    }
 
     const shown = document.createElement("span")
-    shown.className = "chip chip-good"
-    shown.textContent = `#${this.picked.name}`
+    shown.className = "token token-plain"
+    const label = document.createElement("span")
+    label.textContent = `#${this.picked.name}`
+    shown.append(label)
+
+    const remove = document.createElement("button")
+    remove.type = "button"
+    remove.className = "token-x"
+    remove.dataset.action = "click->channel-picker#drop"
+    remove.setAttribute("aria-label", `remove #${this.picked.name}`)
+    remove.textContent = "×"
+    shown.append(remove)
+
     this.chosenTarget.append(shown)
+    this.inputTarget.placeholder = ""
 
     const field = document.createElement("input")
     field.type = "hidden"
@@ -168,6 +187,7 @@ export default class extends Controller {
 
   clearResults() {
     this.resultsTarget.innerHTML = ""
+    this.resultsTarget.hidden = true
     this.at = -1
   }
 }

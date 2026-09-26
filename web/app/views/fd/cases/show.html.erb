@@ -157,6 +157,9 @@
           <%= opens_modal "case.act", "Log an action", opens: "log-action", on: @case %>
         </div>
       </div>
+      <% if @thread_guards.any? %>
+        <%= render "thread_guards", guards: @thread_guards, names: names %>
+      <% end %>
       <% if @actions.any? %>
         <%= render "actions", kase: @case, actions: @actions,
               cited_messages: @cited_messages %>

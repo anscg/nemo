@@ -580,6 +580,7 @@
     background: var(--accent-soft);
     color: var(--accent-deep);
   }
+  .token-plain { height: auto; gap: 6px; padding: 4px 5px 4px 9px; }
   .token .row-avatar, .token .avatar, .token > img { width: 16px; height: 16px; font-size: 9px; }
   .token-x {
     display: inline-grid;

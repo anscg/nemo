@@ -10,6 +10,27 @@ module Fd
     end
 
     ACTIVITY_SHOWN = 50
+    PICK_SHOWN = 40
+    SPAN = "LEFT JOIN analytics.fct_channel_span s " \
+           "ON s.channel_id = dim_channel.channel_id".freeze
+
+    def search
+      term = params[:q].to_s.strip.delete_prefix("#")
+      scope = Analytics::DimChannel.where(archived: false)
+      if term.present?
+        like = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
+        scope = scope.where("dim_channel.name ILIKE :like OR " \
+                            "dim_channel.channel_id ILIKE :like", like: like)
+      end
+
+      render json: {
+        channels: scope.joins(SPAN)
+          .order(Arel.sql("s.total_members DESC NULLS LAST, dim_channel.name"))
+          .limit(PICK_SHOWN).pluck(:channel_id, :name)
+          .map { |id, name| { id: id, name: name } },
+        total: scope.count
+      }
+    end
 
     def show
       @channel_id = params[:channel_id].to_s.strip.upcase
