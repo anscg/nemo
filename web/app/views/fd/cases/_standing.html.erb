@@ -1,0 +1,11 @@
+<%= turbo_frame_tag "action-standing" do %>
+  <% if guard %>
+    <div class="flag <%= guard.failed? ? "flag-crit" : "flag-mid" %>">
+      <span class="flag-icon" aria-hidden="true">◆</span>
+      <div>
+        <b><%= guard_standing_line(guard, kase.id, names) %></b>
+        <span class="sub"><%= guard_footnote(guard, names) %></span>
+      </div>
+    </div>
+  <% end %>
+<% end %>

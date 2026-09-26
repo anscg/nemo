@@ -39,6 +39,7 @@ Rails.application.routes.draw do
     resource :role_permission, only: [:update, :destroy], controller: "role_permissions"
     resource :flag, only: [:update], controller: "flags"
     resources :cases, only: [:index, :show, :create, :update] do
+      resource :standing, only: [:show], controller: "standings"
       resource :claim, only: [:create, :destroy]
       resources :assignees, only: [:create, :destroy]
       resource :resolution, only: [:create, :destroy]

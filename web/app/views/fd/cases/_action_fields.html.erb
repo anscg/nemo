@@ -1,7 +1,8 @@
 <label class="field-label">
   What was done
   <%= select_tag :type_key, options_for_select(action_options),
-        class: "select action-type", id: nil %>
+        class: "select action-type", id: nil,
+        data: { action: "change->action-standing#look" } %>
 </label>
 <div class="field-label">
   <span>Directed at</span>
@@ -16,7 +17,8 @@
 <label class="field-label when when-channel">
   Which channel
   <%= text_field_tag :channel_id, nil, class: "input", id: nil,
-        placeholder: "C0266FRGV" %>
+        placeholder: "C0266FRGV",
+        data: { action: "change->action-standing#look" } %>
 </label>
 <label class="field-label">
   What it is about

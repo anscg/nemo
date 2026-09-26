@@ -1394,4 +1394,46 @@ module FdHelper
       "Resolved #{on_day(kase.resolved_at)} as #{kase.resolution.tr('_', ' ')}."
     end
   end
+
+  def guard_already(guard)
+    said = action_label(guard.kind).downcase
+    return said unless guard.channel_scoped?
+
+    safe_join([said, " in ", channel_link(guard.channel_id)])
+  end
+
+  def guard_whose(guard, case_id)
+    return "on no case" if guard.orphaned?
+    return "on this case" if guard.case_id == case_id
+
+    link_to "under case #{guard.case_id}", fd_case_path(guard.case_id)
+  end
+
+  def guard_standing_line(guard, case_id, names = Names.none)
+    safe_join([
+      names[guard.subject_id],
+      " is already ",
+      guard_already(guard),
+      " ",
+      guard_whose(guard, case_id),
+      "."
+    ])
+  end
+
+  GUARD_CARRY = {
+    "pending" => "nemo has not carried it yet",
+    "failed" => "nemo is not holding it"
+  }.freeze
+
+  def guard_footnote(guard, names = Names.none)
+    said = ["opened by #{names[guard.opened_by]}"]
+    said << "since #{guard.opened_at.strftime("%-d %b")}" if guard.opened_at
+    said << (guard.expires_at ? "until #{guard.expires_at.strftime("%-d %b")}" : "with no end date")
+    said << if guard.by_hand?
+      "done by hand"
+    else
+      GUARD_CARRY[guard.carry]
+    end
+    said.compact.join("  \u00b7  ")
+  end
 end

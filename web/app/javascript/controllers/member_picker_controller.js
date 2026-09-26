@@ -183,5 +183,6 @@ export default class extends Controller {
     }
 
     this.inputTarget.placeholder = this.chosen.size > 0 ? "" : "search by name or paste a user id"
+    this.dispatch("picked", { detail: { chosen: [...this.chosen.keys()] } })
   }
 }
