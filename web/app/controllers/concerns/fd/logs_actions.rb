@@ -81,9 +81,9 @@ module Fd
       guard = if standing.guard.nil?
         open_guard(kase)
       elsif settle_choice == MemberGuard::ADOPT
-        attach_guard(standing.guard, kase)
+        attached(standing.guard, kase)
       elsif settle_choice == MemberGuard::EXTEND
-        run_guard_until(standing.guard)
+        extended(standing.guard)
       elsif standing.reads == MemberGuard::HERE
         standing.guard
       end
@@ -93,38 +93,30 @@ module Fd
     end
 
     def open_guard(kase)
-      done = settle_choice == MemberGuard::ALREADY_DONE
-      guard = MemberGuard.create!(
+      guard = MemberGuard.open!(
         kind: Action.guard_kind(type_key), subject_id: target_user_id,
-        channel_id: guard_channel, case_id: kase.id,
-        opened_by: current_account.user_id, reason: params[:reason].to_s.strip,
-        expires_at: expiry,
-        carried_by: done ? MemberGuard::BY_HAND : "nemo",
-        carry: done ? MemberGuard::HELD : MemberGuard::PENDING
+        channel_id: guard_channel, case_id: kase.id, by: current_account.user_id,
+        reason: params[:reason].to_s.strip, expires_at: expiry,
+        by_hand: settle_choice == MemberGuard::ALREADY_DONE
       )
-      audit(guard, "opened")
+      audit(guard, "opened") if guard
       guard
-    rescue ActiveRecord::RecordNotUnique
-      nil
     end
 
-    def attach_guard(guard, kase)
-      won = MemberGuard.still_on.where(id: guard.id, case_id: nil)
-        .update_all(case_id: kase.id, updated_at: Time.current)
-      return nil if won.zero?
+    def attached(guard, kase)
+      was = guard.case_id
+      return nil unless guard.attach_to!(kase.id)
 
-      audit(guard, "attached", before: { "case_id" => nil }, after: { "case_id" => kase.id })
-      guard.reload
+      audit(guard, "attached", before: { "case_id" => was }, after: { "case_id" => kase.id })
+      guard
     end
 
-    def run_guard_until(guard)
+    def extended(guard)
       was = guard.expires_at
-      won = MemberGuard.still_on.where(id: guard.id)
-        .update_all(expires_at: expiry, updated_at: Time.current)
-      return nil if won.zero?
+      return nil unless guard.run_until!(expiry)
 
       audit(guard, "extended", before: { "expires_at" => was }, after: { "expires_at" => expiry })
-      guard.reload
+      guard
     end
 
     def chosen_category(kase)

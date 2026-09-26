@@ -294,13 +294,6 @@ module FdHelper
     entries.group_by { |entry| entry.at.to_date.beginning_of_month }
   end
 
-  def in_force_line(action, names)
-    span = action.expires? ? " until #{on_day(action.expires_at)}" : ""
-    tail = ", set by #{names[action.decided_by]} on #{on_day(action.performed_at)}"
-    tail += " after case #{action.case_id}" if action.case_id
-    safe_join([tag.b(action_label(action.type_key)), "#{span}#{tail}."])
-  end
-
   HISTORY_EMPTY = {
     "cases" => "No case has ever involved them.",
     "actions" => "Nothing has ever been done to them.",
@@ -1393,6 +1386,19 @@ module FdHelper
     if kase.resolved?
       "Resolved #{on_day(kase.resolved_at)} as #{kase.resolution.tr('_', ' ')}."
     end
+  end
+
+  def guard_kind_options
+    Fd::MemberGuard::KINDS.map { |key| [ACTION_LABELS.fetch(key, key), key] }
+  end
+
+  def guard_held_line(guard)
+    said = if guard.channel_scoped?
+      safe_join([action_label(guard.kind), " in ", channel_link(guard.channel_id)])
+    else
+      action_label(guard.kind)
+    end
+    guard.orphaned? ? safe_join([said, ", on no case"]) : said
   end
 
   def guard_already(guard)

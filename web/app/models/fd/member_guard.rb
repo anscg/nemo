@@ -15,6 +15,7 @@ module Fd
     HELD = "held".freeze
     FAILED = "failed".freeze
 
+    NEMO = "nemo".freeze
     BY_HAND = "by_hand".freeze
 
     CARRY = "carry".freeze
@@ -67,6 +68,37 @@ module Fd
 
       where = Action.guard_scope(type_key) == "channel" ? channel_id : nil
       standing_for(subject_id, kind: kind, channel_id: where)
+    end
+
+    def self.open!(kind:, subject_id:, by:, reason:, channel_id: nil, case_id: nil,
+      expires_at: nil, by_hand: false)
+      transaction(requires_new: true) do
+        create!(kind: kind, subject_id: subject_id, channel_id: channel_id, case_id: case_id,
+          opened_by: by, reason: reason, expires_at: expires_at,
+          carried_by: by_hand ? BY_HAND : NEMO, carry: by_hand ? HELD : PENDING)
+      end
+    rescue ActiveRecord::RecordNotUnique
+      nil
+    end
+
+    def attach_to!(case_id)
+      won = self.class.still_on.where(id: id, case_id: nil)
+        .update_all(case_id: case_id, updated_at: Time.current)
+      won.positive? ? reload : nil
+    end
+
+    def run_until!(expires_at)
+      won = self.class.still_on.where(id: id)
+        .update_all(expires_at: expires_at, updated_at: Time.current)
+      won.positive? ? reload : nil
+    end
+
+    def lift!(by:, reason: nil)
+      won = self.class.still_on.where(id: id).update_all(
+        state: LIFTED, lifted_at: Time.current, lifted_by: by,
+        lift_reason: reason, updated_at: Time.current
+      )
+      won.positive? ? reload : nil
     end
 
     def live? = state == LIVE

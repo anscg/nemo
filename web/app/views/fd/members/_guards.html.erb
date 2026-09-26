@@ -1,0 +1,69 @@
+<%= render layout: "fd/modal", locals: { id: "member-guard", title: "Take action",
+      sub: member, open: params[:do] == "guard" } do %>
+  <%= form_with url: fd_member_guards_path(user_id), method: :post,
+        html: { autocomplete: "off" } do %>
+    <div class="modal-body">
+      <p class="modal-note">
+        This is held on them directly, with no case behind it. A case can adopt it later.
+      </p>
+      <label class="field-label">
+        What to hold
+        <%= select_tag :kind, options_for_select(guard_kind_options),
+              class: "select", id: nil %>
+      </label>
+      <label class="field-label">
+        Until when
+        <%= date_field_tag :expires_on, nil, class: "input", id: nil %>
+      </label>
+      <label class="field-label">
+        Which channel, for a channel ban
+        <%= text_field_tag :channel_id, nil, class: "input", id: nil,
+              placeholder: "C0266FRGV" %>
+      </label>
+      <label class="field-label">
+        Why
+        <%= text_area_tag :reason, field_was(:reason), rows: 3, class: "textarea", id: nil,
+              placeholder: "what they did, and why this is the answer to it" %>
+      </label>
+      <%= field_wrong(:reason) %>
+      <fieldset class="field-label settle">
+        <legend>Enforcement</legend>
+        <label class="settle-pick">
+          <%= radio_button_tag :settle, Fd::MemberGuard::CARRY, true, id: nil %>
+          <span>Nemo carries it out</span>
+        </label>
+        <label class="settle-pick">
+          <%= radio_button_tag :settle, Fd::MemberGuard::ALREADY_DONE, false, id: nil %>
+          <span>It is already done, just record it</span>
+        </label>
+      </fieldset>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" data-action="click->modal#shut">Cancel</button>
+      <%= submit_tag "Hold it", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+<% end %>
+
+<% guards.each do |guard| %>
+  <%= render layout: "fd/modal", locals: { id: "guard-lift-#{guard.id}", title: "Lift it",
+        sub: member, open: false } do %>
+    <%= form_with url: fd_member_guard_path(user_id, guard), method: :delete,
+          html: { autocomplete: "off" } do %>
+      <div class="modal-body">
+        <p class="modal-note">
+          It stops standing. The record keeps it, and what it was for.
+        </p>
+        <label class="field-label">
+          Why it is being lifted
+          <%= text_area_tag :lift_reason, nil, rows: 3, class: "textarea", id: nil,
+                placeholder: "optional" %>
+        </label>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" data-action="click->modal#shut">Cancel</button>
+        <%= submit_tag "Lift it", class: "btn btn-danger" %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

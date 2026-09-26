@@ -30,6 +30,7 @@ Rails.application.routes.draw do
     resources :channels, only: [:index, :show], param: :channel_id
     resources :members, only: [:index, :show] do
       resources :notes, only: [:create, :destroy], controller: "member_notes"
+      resources :guards, only: [:create, :update, :destroy], controller: "member_guards"
     end
     resources :files, only: [:show]
     resource :search, only: [:show], controller: "searches"
