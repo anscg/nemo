@@ -6,6 +6,10 @@ actions:
     label: Shush
     expires: true
     weight: 5
+    enforce:
+      guard: shush
+      scope: workspace
+      carry: reactive
   temp_ban:
     label: Temporary ban
     expires: true
@@ -21,6 +25,10 @@ actions:
     expires: true
     channel: required
     weight: 4
+    enforce:
+      guard: channel_ban
+      scope: channel
+      carry: reactive
   locked_thread:
     label: Locked thread
     channel: optional
