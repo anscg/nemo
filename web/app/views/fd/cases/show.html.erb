@@ -280,7 +280,7 @@
       <%= render "action_fields", kase: @case, flagged: @flagged_messages,
               target: @people.chosen&.user_id || lone_subject(@case) %>
 
-      <%= render "standing", guard: nil, kase: @case, names: names %>
+      <%= render "standing", standing: nil, kase: @case, names: names, type_key: nil %>
 
     </div>
     <div class="modal-foot">

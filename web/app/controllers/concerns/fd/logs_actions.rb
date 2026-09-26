@@ -61,6 +61,72 @@ module Fd
       )
     end
 
+    def settle_choice
+      params[:settle].to_s.presence || MemberGuard::RECORD
+    end
+
+    def standing_for(kase)
+      MemberGuard.settle(type_key, target_user_id, case_id: kase.id, channel_id: guard_channel)
+    end
+
+    def guard_channel
+      return nil unless Action.guard_scope(type_key) == "channel"
+
+      channel_id.presence
+    end
+
+    def settle_guard(kase, action, standing)
+      return nil unless standing.enforceable?
+
+      guard = if standing.guard.nil?
+        open_guard(kase)
+      elsif settle_choice == MemberGuard::ADOPT
+        attach_guard(standing.guard, kase)
+      elsif settle_choice == MemberGuard::EXTEND
+        run_guard_until(standing.guard)
+      elsif standing.reads == MemberGuard::HERE
+        standing.guard
+      end
+
+      action.update!(guard_id: guard.id) if guard
+      guard
+    end
+
+    def open_guard(kase)
+      done = settle_choice == MemberGuard::ALREADY_DONE
+      guard = MemberGuard.create!(
+        kind: Action.guard_kind(type_key), subject_id: target_user_id,
+        channel_id: guard_channel, case_id: kase.id,
+        opened_by: current_account.user_id, reason: params[:reason].to_s.strip,
+        expires_at: expiry,
+        carried_by: done ? MemberGuard::BY_HAND : "nemo",
+        carry: done ? MemberGuard::HELD : MemberGuard::PENDING
+      )
+      audit(guard, "opened")
+      guard
+    rescue ActiveRecord::RecordNotUnique
+      nil
+    end
+
+    def attach_guard(guard, kase)
+      won = MemberGuard.still_on.where(id: guard.id, case_id: nil)
+        .update_all(case_id: kase.id, updated_at: Time.current)
+      return nil if won.zero?
+
+      audit(guard, "attached", before: { "case_id" => nil }, after: { "case_id" => kase.id })
+      guard.reload
+    end
+
+    def run_guard_until(guard)
+      was = guard.expires_at
+      won = MemberGuard.still_on.where(id: guard.id)
+        .update_all(expires_at: expiry, updated_at: Time.current)
+      return nil if won.zero?
+
+      audit(guard, "extended", before: { "expires_at" => was }, after: { "expires_at" => expiry })
+      guard.reload
+    end
+
     def chosen_category(kase)
       asked = params[:category_key].to_s
       return asked if Case::CATEGORIES.include?(asked)

@@ -17,6 +17,12 @@ module Fd
 
     BY_HAND = "by_hand".freeze
 
+    CARRY = "carry".freeze
+    ALREADY_DONE = "by_hand".freeze
+    ADOPT = "adopt".freeze
+    EXTEND = "extend".freeze
+    RECORD = "record".freeze
+
     UNGUARDED = :unguarded
     ORPHANED = :orphaned
     ELSEWHERE = :elsewhere
@@ -35,6 +41,21 @@ module Fd
     scope :stuck, -> { where(carry: FAILED) }
     scope :oldest_first, -> { order(:opened_at, :id) }
     scope :for_subject, ->(subject_id) { where(subject_id: subject_id) }
+
+    Standing = Struct.new(:enforceable, :guard, :reads, :case_id, keyword_init: true) do
+      def found? = guard.present?
+      def enforceable? = enforceable
+    end
+
+    def self.settle(type_key, subject_id, case_id: nil, channel_id: nil)
+      unless Action.enforceable?(type_key)
+        return Standing.new(enforceable: false, guard: nil, reads: UNGUARDED, case_id: case_id)
+      end
+
+      guard = subject_id.present? ? for_action(type_key, subject_id, channel_id: channel_id) : nil
+      Standing.new(enforceable: true, guard: guard, case_id: case_id,
+        reads: guard ? guard.reads_for(case_id) : UNGUARDED)
+    end
 
     def self.standing_for(subject_id, kind:, channel_id: nil)
       still_on.find_by(subject_id: subject_id, kind: kind, channel_id: channel_id)

@@ -22,6 +22,7 @@ module Fd
       "Channels::Audience::Setting" => "channel_audience",
       "Channels::Audience::Grant" => "channel_audience",
       "Fd::ChannelGuard" => "channel_guard",
+      "Fd::MemberGuard" => "member_guard",
       "Fd::ChannelGuardAllow" => "channel_allow",
       "Fd::AppSetting" => "app_setting",
       "Authz::Grant" => "capability_grant",
@@ -31,7 +32,7 @@ module Fd
     VERBS = %w[
       opened lifted claimed unclaimed resolved reopened categorised
       performed reversed received
-      noted deleted attached detached flagged unflagged closed answered
+      noted deleted attached detached flagged unflagged closed answered extended
       added removed
       granted revoked refused
       linked unlinked

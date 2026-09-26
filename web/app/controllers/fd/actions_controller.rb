@@ -16,7 +16,10 @@ module Fd
       named = false
       writing do
         named = name_a_subject(kase)
-        audit(log_action(kase, Time.current), "performed")
+        standing = standing_for(kase)
+        action = log_action(kase, Time.current)
+        audit(action, "performed")
+        settle_guard(kase, action, standing)
       end
 
       redirect_to fd_case_path(kase, tab: "actions"), notice: logged_notice(kase, named)

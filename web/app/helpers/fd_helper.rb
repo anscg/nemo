@@ -1436,4 +1436,34 @@ module FdHelper
     end
     said.compact.join("  \u00b7  ")
   end
+  SETTLE_DEFAULT = {
+    Fd::MemberGuard::UNGUARDED => Fd::MemberGuard::CARRY,
+    Fd::MemberGuard::ORPHANED => Fd::MemberGuard::ADOPT,
+    Fd::MemberGuard::ELSEWHERE => Fd::MemberGuard::RECORD,
+    Fd::MemberGuard::HERE => Fd::MemberGuard::RECORD
+  }.freeze
+
+  def settle_options(standing, type_key)
+    return [] unless standing&.enforceable?
+
+    case standing.reads
+    when Fd::MemberGuard::UNGUARDED
+      [[Fd::MemberGuard::CARRY, "Nemo carries it out"],
+       [Fd::MemberGuard::ALREADY_DONE, "It is already done, just record it"]]
+    when Fd::MemberGuard::ORPHANED
+      [[Fd::MemberGuard::ADOPT, "Attach it to this case"],
+       [Fd::MemberGuard::RECORD, "Leave it where it is, just record this"]]
+    else
+      built = []
+      if Fd::Action::NEEDS_EXPIRY.include?(type_key)
+        built << [Fd::MemberGuard::EXTEND, "Change it to the date above"]
+      end
+      built << [Fd::MemberGuard::RECORD, "Just record this"]
+      built.one? ? [] : built
+    end
+  end
+
+  def settle_default(standing)
+    SETTLE_DEFAULT.fetch(standing&.reads, Fd::MemberGuard::RECORD)
+  end
 end

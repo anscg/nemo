@@ -1,4 +1,5 @@
 <%= turbo_frame_tag "action-standing" do %>
+  <% guard = standing&.guard %>
   <% if guard %>
     <div class="flag <%= guard.failed? ? "flag-crit" : "flag-mid" %>">
       <span class="flag-icon" aria-hidden="true">◆</span>
@@ -7,5 +8,17 @@
         <span class="sub"><%= guard_footnote(guard, names) %></span>
       </div>
     </div>
+  <% end %>
+  <% options = settle_options(standing, type_key) %>
+  <% if options.any? %>
+    <fieldset class="field-label settle">
+      <legend>Enforcement</legend>
+      <% options.each do |value, said| %>
+        <label class="settle-pick">
+          <%= radio_button_tag :settle, value, value == settle_default(standing), id: nil %>
+          <span><%= said %></span>
+        </label>
+      <% end %>
+    </fieldset>
   <% end %>
 <% end %>

@@ -355,4 +355,28 @@ class FdHelperTest < ActionView::TestCase
     assert_equal "look here", plain_words("<https://slack.com/x|look here>")
     assert_equal "https://slack.com/x", plain_words("<https://slack.com/x>")
   end
+  def standing(reads, enforceable: true)
+    Fd::MemberGuard::Standing.new(enforceable: enforceable, reads: reads, case_id: 1,
+      guard: Fd::MemberGuard.new(kind: "shush", subject_id: "USUB", opened_by: "UMOD"))
+  end
+
+  def values(standing, type_key)
+    settle_options(standing, type_key).map(&:first)
+  end
+
+  test "an enforceable kind that never expires is offered no extension" do
+    held = standing(Fd::MemberGuard::ELSEWHERE)
+    assert_equal %w[extend record], values(held, "shush")
+    assert_empty values(held, "warning")
+  end
+
+  test "a kind with no enforcement is asked nothing" do
+    assert_empty values(standing(Fd::MemberGuard::UNGUARDED, enforceable: false), "warning")
+    assert_empty settle_options(nil, "shush")
+  end
+
+  test "a guard on this case is offered the same two as one elsewhere" do
+    assert_equal values(standing(Fd::MemberGuard::HERE), "shush"),
+      values(standing(Fd::MemberGuard::ELSEWHERE), "shush")
+  end
 end

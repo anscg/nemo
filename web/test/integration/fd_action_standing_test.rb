@@ -14,6 +14,10 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     }.merge(over))
   end
 
+  def warned?
+    response.body.include?("flag-mid") || response.body.include?("flag-crit")
+  end
+
   def look(**params)
     get fd_case_standing_path(@kase), params: {
       type_key: "shush", target_user_id: "USUB"
@@ -24,19 +28,19 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     guard!
     look(type_key: "warning")
     assert_response :success
-    assert_no_match(/is already/, response.body)
+    assert_not warned?
   end
 
   test "nothing standing warns about nothing" do
     look
     assert_response :success
-    assert_no_match(/is already/, response.body)
+    assert_not warned?
   end
 
   test "a guard on nobody's case says it sits on no case" do
     guard!
     look
-    assert_match(/is already/, response.body)
+    assert warned?
     assert_match(/on no case/, response.body)
     assert_match(/nemo has not carried it yet/, response.body)
   end
@@ -59,28 +63,28 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
   test "a workspace guard is not found by a channel scoped kind" do
     guard!
     look(type_key: "channel_ban", channel_id: "C0266FRGV")
-    assert_no_match(/is already/, response.body)
+    assert_not warned?
   end
 
   test "a channel ban is only found in the channel it was made in" do
     guard!(kind: "channel_ban", channel_id: "C0266FRGV")
     look(type_key: "channel_ban", channel_id: "C0266FRGV")
-    assert_match(/is already/, response.body)
+    assert warned?
 
     look(type_key: "channel_ban", channel_id: "CSOMEWHERE")
-    assert_no_match(/is already/, response.body)
+    assert_not warned?
   end
 
   test "a lifted guard is not standing any more" do
     guard!(state: "lifted", lifted_at: Time.current, lifted_by: "UMOD")
     look
-    assert_no_match(/is already/, response.body)
+    assert_not warned?
   end
 
   test "a guard still being lifted is still standing" do
     guard!(state: "lifting", lifted_by: "UMOD")
     look
-    assert_match(/is already/, response.body)
+    assert warned?
   end
 
   test "a guard nemo has dropped is called out as not holding" do
@@ -108,6 +112,39 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     delete logout_path
     look
     assert_redirected_to login_path
-    assert_no_match(/is already/, response.body)
+    assert_not warned?
+  end
+  def offered
+    response.body.scan(/name="settle" value="([a-z_]+)"/).flatten
+  end
+
+  def preferred
+    response.body[/name="settle" value="([a-z_]+)" checked/, 1]
+  end
+
+  test "nothing standing asks whether nemo carries it" do
+    look
+    assert_equal %w[carry by_hand], offered
+    assert_equal "carry", preferred
+  end
+
+  test "a record only kind is never asked" do
+    guard!
+    look(type_key: "warning")
+    assert_empty offered
+  end
+
+  test "an orphan is offered for adoption, and that is the default" do
+    guard!
+    look
+    assert_equal %w[adopt record], offered
+    assert_equal "adopt", preferred
+  end
+
+  test "a guard under another case defaults to leaving it alone" do
+    guard!(case_id: make_case.id)
+    look
+    assert_equal %w[extend record], offered
+    assert_equal "record", preferred
   end
 end
