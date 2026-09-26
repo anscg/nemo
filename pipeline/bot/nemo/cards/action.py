@@ -12,6 +12,25 @@ WHERE = "action_where"
 REASON = "action_reason"
 CATEGORY = "action_category"
 STANDING = "action_standing"
+SETTLE = "action_settle"
+
+UNGUARDED = "unguarded"
+ORPHANED = "orphaned"
+ELSEWHERE = "elsewhere"
+HERE = "here"
+
+CARRY = "carry"
+BY_HAND = "by_hand"
+ADOPT = "adopt"
+EXTEND = "extend"
+RECORD = "record"
+
+SETTLE_DEFAULT = {
+    UNGUARDED: CARRY,
+    ORPHANED: ADOPT,
+    ELSEWHERE: RECORD,
+    HERE: RECORD,
+}
 
 REASON_LIMIT = 2000
 
@@ -79,6 +98,11 @@ def kind_pick(held):
     return {"initial_option": picked[0]} if picked else {}
 
 
+def expiry(said):
+    on = said.get("expires_on")
+    return f"{on} 23:59:59" if on else None
+
+
 def when(at):
     return at.strftime("%-d %b") if at else None
 
@@ -134,6 +158,60 @@ def standing_blocks(standing):
             "block_id": STANDING,
             "elements": [{"type": "mrkdwn", "text": footnote(found)}],
         },
+    ]
+
+
+def settle_options(said, standing):
+    standing = standing or {}
+    if not standing.get("enforceable"):
+        return []
+
+    reads = standing.get("reads") or UNGUARDED
+    if reads == UNGUARDED:
+        return [
+            (CARRY, "Nemo carries it out"),
+            (BY_HAND, "It is already done, just record it"),
+        ]
+    if reads == ORPHANED:
+        return [
+            (ADOPT, "Attach it to this case"),
+            (RECORD, "Leave it where it is, just record this"),
+        ]
+
+    built = []
+    if needs_expiry(said.get("type_key")):
+        built.append((EXTEND, "Change it to the date above"))
+    built.append((RECORD, "Just record this"))
+    return built if len(built) > 1 else []
+
+
+def settle_blocks(said, standing):
+    options = settle_options(said, standing)
+    if not options:
+        return []
+
+    reads = (standing or {}).get("reads") or UNGUARDED
+    held = said.get("settle")
+    if held not in dict(options):
+        held = SETTLE_DEFAULT.get(reads, RECORD)
+
+    built = [
+        {"text": {"type": "plain_text", "text": text}, "value": value}
+        for value, text in options
+    ]
+    picked = [one for one in built if one["value"] == held]
+    return [
+        {
+            "type": "input",
+            "block_id": SETTLE,
+            "label": {"type": "plain_text", "text": "Enforcement"},
+            "element": {
+                "type": "radio_buttons",
+                "action_id": SETTLE,
+                "options": built,
+                **({"initial_option": picked[0]} if picked else {}),
+            },
+        }
     ]
 
 
@@ -223,6 +301,8 @@ def blocks(case_id, said, standing=None):
             }
         )
 
+    built += settle_blocks(said, standing)
+
     built += [
         {
             "type": "input",
@@ -272,7 +352,9 @@ def unasked(said, shown, standing=None):
         return True
     if needs_channel(key) and WHERE not in shown:
         return True
-    return bool((standing or {}).get("found")) and STANDING not in shown
+    if (standing or {}).get("found") and STANDING not in shown:
+        return True
+    return bool(settle_options(said, standing)) and SETTLE not in shown
 
 
 def picked(view_state):
@@ -284,6 +366,9 @@ def picked(view_state):
         ),
         "expires_on": values.get(UNTIL, {}).get(UNTIL, {}).get("selected_date"),
         "channel_id": values.get(WHERE, {}).get(WHERE, {}).get("selected_conversation"),
+        "settle": (
+            (values.get(SETTLE, {}).get(SETTLE, {}).get("selected_option") or {}).get("value")
+        ),
         "reason": (values.get(REASON, {}).get(REASON, {}).get("value") or "").strip(),
         "category_key": (
             (values.get(CATEGORY, {}).get(CATEGORY, {}).get("selected_option") or {})
@@ -302,6 +387,8 @@ def objection(said):
         return {UNTIL: f"A {label(key).lower()} needs a date it runs until."}
     if needs_channel(key) and not said.get("channel_id"):
         return {WHERE: f"A {label(key).lower()} needs a channel."}
+    if said.get("settle") == EXTEND and not said.get("expires_on"):
+        return {UNTIL: f"Say the date the {label(key).lower()} should run until."}
     if not said.get("reason"):
         return {REASON: "Say why this was the answer."}
     return None

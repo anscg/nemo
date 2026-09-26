@@ -48,8 +48,8 @@ def words(built):
     return "\n".join(said)
 
 
-def standing(found, case_id=412):
-    return {"enforceable": True, "found": found, "case_id": case_id,
+def standing(found, case_id=412, enforceable=True):
+    return {"enforceable": enforceable, "found": found, "case_id": case_id,
             "reads": memberguards.reads(found, case_id)}
 
 
@@ -131,13 +131,23 @@ def test_a_submit_that_never_saw_the_warning_is_sent_back():
     said = {"type_key": "shush", "target_user_id": WHO, "expires_on": "2026-03-10"}
     shown = {action.TARGET, action.KIND, action.UNTIL, action.REASON}
     assert action.unasked(said, shown, standing(guard()))
-    assert not action.unasked(said, shown | {action.STANDING}, standing(guard()))
+    assert action.unasked(said, shown | {action.SETTLE}, standing(guard()))
+    assert not action.unasked(
+        said, shown | {action.STANDING, action.SETTLE}, standing(guard())
+    )
 
 
-def test_a_submit_with_nothing_standing_goes_straight_through():
+def test_an_enforceable_kind_is_always_asked_what_nemo_should_do():
     said = {"type_key": "shush", "target_user_id": WHO, "expires_on": "2026-03-10"}
     shown = {action.TARGET, action.KIND, action.UNTIL, action.REASON}
-    assert not action.unasked(said, shown, standing(None))
+    assert action.unasked(said, shown, standing(None))
+    assert not action.unasked(said, shown | {action.SETTLE}, standing(None))
+
+
+def test_a_record_only_kind_goes_straight_through():
+    said = {"type_key": "warning", "target_user_id": WHO}
+    shown = {action.TARGET, action.KIND, action.REASON}
+    assert not action.unasked(said, shown, standing(None, enforceable=False))
     assert not action.unasked(said, shown)
 
 

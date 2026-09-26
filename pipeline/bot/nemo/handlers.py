@@ -132,12 +132,15 @@ def register(app, on_reply=None):
                     response_action="errors",
                     errors={cards.action.KIND: refusal},
                 )
+            fresh = settle(conn, case_id, said)
             action_id = log_action(conn, case_id, said, user_id)
+            guard_id = memberguards.settled(conn, action_id, said, fresh, user_id)
 
         ack()
         with session() as conn:
             redraw(client, conn, case_id)
-        log.info("nemo: action %s logged on case %s by %s", action_id, case_id, user_id)
+        log.info("nemo: action %s logged on case %s by %s, guard %s",
+                 action_id, case_id, user_id, guard_id)
 
     MORE = {
         cards.edit.CATEGORY: ("case.categorise", cards.edit.category_view),

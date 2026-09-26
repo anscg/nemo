@@ -110,7 +110,11 @@ capabilities:
     label: Log an action against somebody
     area: case
     locked: true
-    events: [action/performed]
+    events:
+      - action/performed
+      - member_guard/opened
+      - member_guard/attached
+      - member_guard/extended
 
   case.resolve:
     label: Resolve a case, mark a duplicate

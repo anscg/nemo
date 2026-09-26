@@ -351,7 +351,7 @@ def reverse_action(conn, case_id, action_id, reason, user_id):
 
 
 def log_action(conn, case_id, said, user_id):
-    expires = f"{said['expires_on']} 23:59:59" if said.get("expires_on") else None
+    expires = cards.action.expiry(said)
     row = conn.execute(
         LOG_ACTION,
         (

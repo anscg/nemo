@@ -1,12 +1,13 @@
+from bot.core import audit
 from bot.nemo.cards import action
 
 SHUSH = "shush"
 CHANNEL_BAN = "channel_ban"
 
-UNGUARDED = "unguarded"
-ORPHANED = "orphaned"
-ELSEWHERE = "elsewhere"
-HERE = "here"
+UNGUARDED = action.UNGUARDED
+ORPHANED = action.ORPHANED
+ELSEWHERE = action.ELSEWHERE
+HERE = action.HERE
 
 FIELDS = (
     "id", "kind", "subject_id", "channel_id", "state", "carry", "carried_by",
@@ -87,3 +88,112 @@ def reads(found, case_id=None):
     if case_id is not None and found["case_id"] == case_id:
         return HERE
     return ELSEWHERE
+
+
+OPEN = """
+INSERT INTO fd.member_guards
+    (kind, subject_id, channel_id, case_id, opened_by, reason, expires_at,
+     carried_by, carry)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT DO NOTHING
+RETURNING id
+"""
+
+ATTACH = """
+UPDATE fd.member_guards SET case_id = %s, updated_at = now()
+WHERE id = %s AND case_id IS NULL AND state IN ('live', 'lifting')
+RETURNING id
+"""
+
+RUN_UNTIL = """
+UPDATE fd.member_guards SET expires_at = %s, updated_at = now()
+WHERE id = %s AND state IN ('live', 'lifting')
+RETURNING id
+"""
+
+LINK = """
+UPDATE fd.actions SET guard_id = %s WHERE id = %s AND guard_id IS NULL RETURNING id
+"""
+
+
+def open_guard(conn, kind, subject_id, by, reason, channel_id=None, case_id=None,
+               expires_at=None, by_hand=False):
+    carried_by, carry = ("by_hand", "held") if by_hand else ("nemo", "pending")
+    row = conn.execute(
+        OPEN,
+        (kind, subject_id, channel_id, case_id, by, reason, expires_at, carried_by, carry),
+    ).fetchone()
+    if row is None:
+        return None
+
+    audit.record(
+        conn, "member_guard", row[0], "opened", by,
+        after={"kind": kind, "subject_id": subject_id, "channel_id": channel_id,
+               "case_id": case_id, "carried_by": carried_by,
+               "expires_at": str(expires_at) if expires_at else None},
+    )
+    return row[0]
+
+
+def attach(conn, guard_id, case_id, by):
+    row = conn.execute(ATTACH, (case_id, guard_id)).fetchone()
+    if row is None:
+        return None
+
+    audit.record(conn, "member_guard", guard_id, "attached", by,
+                 before={"case_id": None}, after={"case_id": case_id})
+    return guard_id
+
+
+def run_until(conn, guard_id, expires_at, was, by):
+    row = conn.execute(RUN_UNTIL, (expires_at, guard_id)).fetchone()
+    if row is None:
+        return None
+
+    audit.record(conn, "member_guard", guard_id, "extended", by,
+                 before={"expires_at": str(was) if was else None},
+                 after={"expires_at": str(expires_at) if expires_at else None})
+    return guard_id
+
+
+def link(conn, action_id, guard_id):
+    row = conn.execute(LINK, (guard_id, action_id)).fetchone()
+    return row[0] if row else None
+
+
+def settled(conn, action_id, said, standing, by):
+    standing = standing or {}
+    if not standing.get("enforceable"):
+        return None
+
+    found = standing.get("found")
+    case_id = standing.get("case_id")
+    chose = said.get("settle") or action.RECORD
+    expires_at = action.expiry(said)
+
+    if found is None:
+        guard_id = open_guard(
+            conn,
+            action.guard_kind(said["type_key"]),
+            said["target_user_id"],
+            by,
+            said["reason"],
+            channel_id=said.get("channel_id")
+            if action.guard_scope(said["type_key"]) == "channel"
+            else None,
+            case_id=case_id,
+            expires_at=expires_at,
+            by_hand=chose == action.BY_HAND,
+        )
+    elif chose == action.ADOPT:
+        guard_id = attach(conn, found["id"], case_id, by)
+    elif chose == action.EXTEND:
+        guard_id = run_until(conn, found["id"], expires_at, found.get("expires_at"), by)
+    elif standing.get("reads") == HERE:
+        guard_id = found["id"]
+    else:
+        guard_id = None
+
+    if guard_id:
+        link(conn, action_id, guard_id)
+    return guard_id
