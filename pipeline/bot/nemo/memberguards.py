@@ -1,3 +1,5 @@
+import threading
+
 from bot.core import audit
 from bot.nemo.cards import action
 
@@ -197,3 +199,97 @@ def settled(conn, action_id, said, standing, by):
     if guard_id:
         link(conn, action_id, guard_id)
     return guard_id
+
+
+LIVE_OF_KIND = """
+SELECT id, subject_id, channel_id, reason, expires_at, carry, carried_by
+FROM fd.member_guards
+WHERE kind = %s AND state = 'live'
+"""
+
+UNCARRIED = """
+SELECT id, subject_id, channel_id, reason, expires_at
+FROM fd.member_guards
+WHERE kind = %s AND state = 'live' AND carry = 'pending' AND carried_by = 'nemo'
+ORDER BY opened_at LIMIT 20
+"""
+
+HOLDING = """
+UPDATE fd.member_guards
+SET carry = 'held', attempts = 0, last_error = NULL, updated_at = now()
+WHERE id = %s AND carry <> 'held'
+RETURNING id
+"""
+
+DROPPED = """
+UPDATE fd.member_guards
+SET carry = 'failed', attempts = attempts + 1, last_error = %s, updated_at = now()
+WHERE id = %s
+RETURNING attempts
+"""
+
+HAPPENED = """
+INSERT INTO fd.member_guard_events
+    (guard_id, subject_id, channel_id, verb, message_ts, permalink, detail)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+RETURNING id
+"""
+
+LATELY = """
+SELECT count(*) FROM fd.member_guard_events
+WHERE guard_id = %s AND verb = %s AND at > now() - %s::interval
+"""
+
+WATCHED = ("id", "subject_id", "channel_id", "reason", "expires_at", "carry", "carried_by")
+
+_held = {}
+_loaded = False
+_lock = threading.Lock()
+
+
+def refresh(conn, kind=SHUSH):
+    global _loaded
+    found = {
+        row[1]: dict(zip(WATCHED, row))
+        for row in conn.execute(LIVE_OF_KIND, (kind,)).fetchall()
+    }
+    with _lock:
+        _held.clear()
+        _held.update(found)
+        _loaded = True
+    return len(found)
+
+
+def shushed(subject_id):
+    with _lock:
+        if not _loaded:
+            return None
+        return _held.get(subject_id)
+
+
+def uncarried(conn, kind=SHUSH):
+    return [
+        {"id": row[0], "subject_id": row[1], "channel_id": row[2],
+         "reason": row[3], "expires_at": row[4]}
+        for row in conn.execute(UNCARRIED, (kind,)).fetchall()
+    ]
+
+
+def holding(conn, guard_id):
+    return conn.execute(HOLDING, (guard_id,)).fetchone() is not None
+
+
+def dropped(conn, guard_id, why):
+    row = conn.execute(DROPPED, (why[:500], guard_id)).fetchone()
+    return row[0] if row else None
+
+
+def happened(conn, guard_id, subject_id, channel_id, verb,
+             message_ts=None, permalink=None, detail=None):
+    return conn.execute(
+        HAPPENED, (guard_id, subject_id, channel_id, verb, message_ts, permalink, detail)
+    ).fetchone()[0]
+
+
+def lately(conn, guard_id, verb, within):
+    return conn.execute(LATELY, (guard_id, verb, within)).fetchone()[0]

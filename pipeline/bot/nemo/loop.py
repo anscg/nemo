@@ -3,7 +3,8 @@ import os
 import threading
 
 from bot.core import loops, session
-from bot.nemo import channel, channelguards, channels, chat, guards, guardwork
+from bot.nemo import channel, channelguards, channels, chat, guards, guardwork, memberguards
+from bot.nemo.carriers import shush
 
 log = logging.getLogger("bot.nemo")
 
@@ -14,6 +15,7 @@ OUTBOX = "fd_outbox_waiting"
 CONVERSATION = "fd_conversation_changed"
 GUARD = "fd_thread_guard"
 CHANNEL_GUARD = "fd_channel_guard"
+MEMBER_GUARD = "fd_member_guard"
 APP_SETTING = "fd_app_setting"
 
 DEFAULT_SECONDS = 300
@@ -62,6 +64,11 @@ def take_a_seat(client, channel_id):
         return channels.join(client, conn, channel_id, verb="joined")
 
 
+def take_up(client, guard):
+    with session() as conn:
+        shush.take_up(client, conn, guard)
+
+
 def apart(*doing):
     for name, work in doing:
         try:
@@ -102,6 +109,8 @@ def once(desk, channel_id=None):
         unshared = channel.waiting_files(conn)
         guards.refresh(conn)
         channelguards.refresh(conn)
+        memberguards.refresh(conn)
+        taking_up = memberguards.uncarried(conn)
         channel.firehouse_channel(conn)
         destroying = guards.pending(conn)
         lifting = guards.lifting(conn)
@@ -124,6 +133,9 @@ def once(desk, channel_id=None):
         apart((f"destroying guard {guard_id}", lambda id=guard_id: guardwork.run_destroy(client, id)))
     for guard_id in lifting:
         apart((f"lifting guard {guard_id}", lambda id=guard_id: guardwork.lift_lock(client, id)))
+    for guard in taking_up:
+        apart((f"taking up shush {guard['id']}",
+               lambda one=guard: take_up(client, one)))
     apart(
         ("clearing what the guard could not remove", lambda: guardwork.sweep_removals(client)),
         ("resetting sessions the guard has earned", guardwork.sweep_strikes),
@@ -134,8 +146,10 @@ def once(desk, channel_id=None):
 
 def start(desk, stopping, channel_id=None):
     with session() as conn:
-        log.info("nemo: watching %s guarded thread(s) and %s guarded channel(s)",
-                 guards.refresh(conn), channelguards.refresh(conn))
+        log.info("nemo: watching %s guarded thread(s), %s guarded channel(s) "
+                 "and %s shushed member(s)",
+                 guards.refresh(conn), channelguards.refresh(conn),
+                 memberguards.refresh(conn))
 
     def heard(channel_name, told):
         if channel_name == CHAT:
@@ -159,6 +173,13 @@ def start(desk, stopping, channel_id=None):
                 target=take_a_seat, args=(desk.client, told),
                 name=f"nemo-seat-{told}", daemon=True,
             ).start()
+        elif channel_name == MEMBER_GUARD:
+            with session() as conn:
+                memberguards.refresh(conn)
+                taking_up = memberguards.uncarried(conn)
+            for guard in taking_up:
+                apart((f"taking up shush {guard['id']}",
+                       lambda one=guard: take_up(desk.client, one)))
         elif channel_name == CONVERSATION:
             apart(("catching up", lambda: desk.caught_up(told)),
                   ("ticking", desk.tick_queued))
@@ -167,7 +188,8 @@ def start(desk, stopping, channel_id=None):
 
     return (
         loops.watching(NAME,
-                       (CASES, CHAT, OUTBOX, CONVERSATION, GUARD, CHANNEL_GUARD, APP_SETTING),
+                       (CASES, CHAT, OUTBOX, CONVERSATION, GUARD, CHANNEL_GUARD,
+                        MEMBER_GUARD, APP_SETTING),
                        heard, stopping),
         loops.sweeping(NAME, every(), lambda: once(desk, channel_id), stopping),
         loops.sweeping(f"{NAME}-joins", every_join_sweep(), lambda: join_sweep(desk), stopping),
