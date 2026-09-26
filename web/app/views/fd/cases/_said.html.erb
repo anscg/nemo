@@ -1,6 +1,6 @@
 <div id="said-<%= entry.key %>" class="msg <%= entry.side == "out" ? "out" : "in" %>"
      data-kind="<%= entry.kind %>">
-  <%= face(entry.who) %>
+  <%= entry.anon ? anonymous_face : face(entry.who) %>
   <div>
     <div class="msg-head">
       <span class="msg-who"><%= entry.name %></span>

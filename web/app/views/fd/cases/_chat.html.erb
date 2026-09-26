@@ -24,7 +24,7 @@
         <% end %>
       </span>
     <% elsif thread %>
-      <%= face(thread.anonymous? ? nil : thread.reporter_user_id) %>
+      <%= thread.anonymous? ? anonymous_face : face(thread.reporter_user_id) %>
       <span class="grow two-line">
         <b><%= thread.reporter_label(names) %></b>
         <span><%= chat_head_line([thread], kase, said: said_count) %></span>

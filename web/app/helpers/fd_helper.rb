@@ -470,8 +470,8 @@ module FdHelper
     ROLE_TONES.fetch(role, "chip-off")
   end
 
-  ChatEntry = Struct.new(:key, :at, :side, :kind, :who, :name, :body, :state, :files, :shares,
-    keyword_init: true)
+  ChatEntry = Struct.new(:key, :at, :side, :kind, :who, :anon, :name, :body, :state, :files,
+    :shares, keyword_init: true)
 
   def chat_stream(kase)
     "case_#{kase.id}_chat"
@@ -509,6 +509,7 @@ module FdHelper
     reports.map do |report|
       ChatEntry.new(key: "open-#{report.id}", at: report.received_at, side: "in", kind: "them",
         who: (report.reporter_user_id unless report.anonymous?),
+        anon: report.anonymous?,
         name: report.reporter_label(names),
         body: report.body.presence)
     end
@@ -523,6 +524,7 @@ module FdHelper
       side: theirs ? "in" : "out",
       kind: theirs ? "them" : "us",
       who: masked ? nil : (theirs ? said.author_user_id : said.sent_by),
+      anon: masked,
       name: message_name(said, hidden),
       body: message_body(said, files),
       state: ("deleted in Slack" if said.deleted?),
@@ -911,12 +913,16 @@ module FdHelper
 
   ANONYMOUS_FACE = "/anonymous.png".freeze
 
+  def anonymous_face(css: "row-avatar")
+    image_tag(ANONYMOUS_FACE, class: css, alt: "", width: 22, height: 22,
+      loading: "lazy", title: "Anonymous")
+  end
+
   def row_reporter_face(kase)
     who = row_reporter(kase)
     return face(who) if who.present?
 
-    image_tag(ANONYMOUS_FACE, class: "row-avatar", alt: "", width: 22, height: 22,
-      loading: "lazy", title: "Anonymous")
+    anonymous_face
   end
 
   def case_priors(kase, counts)
