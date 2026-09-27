@@ -23,9 +23,9 @@ module Fd
       FdHelper::ACTION_LABELS.fetch(type_key, type_key)
     end
 
-    def action_objection
+    def action_objection(kase)
       return "pick what was done" unless FdHelper::ACTION_LABELS.key?(type_key)
-      return thread_lock_objection if Action.from_thread_lock?(type_key)
+      return thread_lock_objection(kase) if Action.from_thread_lock?(type_key)
       return "say who it was directed at" if target_user_id.blank?
       return "#{target_user_id} is not a member id" unless target_user_id.match?(MEMBER_ID)
       if NEEDS_EXPIRY.include?(type_key)
@@ -62,9 +62,11 @@ module Fd
       )
     end
 
-    def thread_lock_objection
+    def thread_lock_objection(kase)
+      family = kase.family_ids
       return "pick which thread lock this is" if thread_lock.nil?
-      if Action.live.exists?(case_id: params[:case_id], thread_guard_id: thread_lock.id)
+      return "that thread lock is already on this case" if thread_lock.on_case?(family)
+      if Action.live.exists?(case_id: family, thread_guard_id: thread_lock.id)
         return "that thread lock is already logged on this case"
       end
 
@@ -93,6 +95,19 @@ module Fd
         category_key: chosen_category(kase), thread_guard_id: guard.id,
         details: { "channel_id" => guard.channel_id, "thread_ts" => guard.thread_ts }
       )
+    end
+
+    def guard_said(guard) = FdHelper::ACTION_LABELS.fetch(guard.kind, guard.kind).downcase
+
+    def standing_objection(kase, guard)
+      family = kase.family_ids
+      said = guard_said(guard)
+      return "that #{said} is already on this case" if guard.on_case?(family)
+      if Action.live.exists?(case_id: family, guard_id: guard.id)
+        return "that #{said} is already logged on this case"
+      end
+
+      nil
     end
 
     def standing_guard

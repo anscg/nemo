@@ -116,6 +116,8 @@ module Fd
     def orphaned? = case_id.nil?
     def channel_scoped? = channel_id.present?
 
+    def on_case?(case_ids) = case_id.present? && Array(case_ids).include?(case_id)
+
     def reads_for(on_case_id)
       return ORPHANED if orphaned?
       return HERE if on_case_id.present? && case_id == on_case_id

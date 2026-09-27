@@ -283,6 +283,7 @@
     <div class="modal-body">
       <%= render "action_fields", kase: @case, flagged: @flagged_messages, names: names,
               standing: @action_standing, thread_locks: @thread_locks,
+              guards_logged: @guards_logged, locks_logged: @locks_logged,
               target: @people.chosen&.user_id || lone_subject(@case) %>
 
     </div>

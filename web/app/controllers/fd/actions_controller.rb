@@ -9,7 +9,7 @@ module Fd
       lock = Action.from_thread_lock?(type_key) ? thread_lock : nil
       held = lock ? nil : standing_guard
 
-      problem = held ? nil : action_objection
+      problem = held ? standing_objection(kase, held) : action_objection(kase)
       if problem
         return redirect_to(fd_case_path(kase, do: "action"),
           alert: (problem unless flash[:wrong]))
@@ -56,8 +56,8 @@ module Fd
     end
 
     def attached_notice(kase, guard)
-      said = FdHelper::ACTION_LABELS.fetch(guard.kind, guard.kind).downcase
-      "the #{said} already standing on @#{guard.subject_id} is now on case #{kase.id}"
+      "the #{guard_said(guard)} already standing on @#{guard.subject_id} " \
+        "is now on case #{kase.id}"
     end
 
     def locked_notice(kase, adopted)

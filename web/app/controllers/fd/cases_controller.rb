@@ -28,6 +28,8 @@ module Fd
       @live_actions = @actions.reject(&:reversed?)
       @thread_guards = ThreadGuard.for_case(family).newest_first.to_a
       @thread_locks = ThreadGuard.pickable_locks(family)
+      @locks_logged = Action.thread_guards_logged_on(family)
+      @guards_logged = Action.guards_logged_on(family)
       subjects = @case.subject_user_ids
       @action_standing = MemberGuard.standing_on(
         @people.chosen&.user_id || (subjects.first if subjects.one?)

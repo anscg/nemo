@@ -6,7 +6,8 @@
 </div>
 
 <div data-action-standing-target="standing">
-  <%= render "standing", guards: standing, kase: kase, names: names %>
+  <%= render "standing", guards: standing, kase: kase, names: names,
+        logged: guards_logged %>
 </div>
 
 <div class="fieldset" data-action-standing-target="fields">
@@ -16,7 +17,7 @@
           class: "select action-type", id: nil,
           data: { action: "change->action-standing#shape" } %>
   </label>
-  <%= render "thread_lock_pick", locks: thread_locks, kase: kase %>
+  <%= render "thread_lock_pick", locks: thread_locks, kase: kase, logged: locks_logged %>
   <label class="field-label" data-action-standing-target="expiry" hidden>
     Until when
     <%= date_field_tag :expires_on, nil, class: "input", id: nil %>

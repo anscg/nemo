@@ -90,12 +90,13 @@ class FdActionSettleTest < ActionDispatch::IntegrationTest
     assert_empty told("attached")
   end
 
-  test "choosing one already on this case logs it without attaching again" do
+  test "choosing one already on this case is refused, not logged again" do
     held = guard!(case_id: @kase.id)
     act(standing_guard_id: held.id)
 
-    assert_equal held.id, logged.guard_id
+    assert_equal 0, @kase.actions.count
     assert_empty told("attached")
+    assert_match(/already on this case/, flash[:alert])
   end
 
   test "choosing one needs none of the fields the form would otherwise want" do
@@ -135,5 +136,26 @@ class FdActionSettleTest < ActionDispatch::IntegrationTest
     act
     assert_empty guards
     assert_empty @kase.actions
+  end
+
+  test "a guard held by another case is logged here once, not twice" do
+    other = make_case
+    guard = guard!(case_id: other.id)
+    act(standing_guard_id: guard.id)
+    act(standing_guard_id: guard.id)
+
+    assert_equal 1, @kase.actions.count
+    assert_equal other.id, guard.reload.case_id
+    assert_match(/already logged on this case/, flash[:alert])
+  end
+
+  test "an orphaned guard is attached once, then refused" do
+    guard = guard!(case_id: nil)
+    act(standing_guard_id: guard.id)
+    act(standing_guard_id: guard.id)
+
+    assert_equal 1, @kase.actions.count
+    assert_equal @kase.id, guard.reload.case_id
+    assert_match(/already on this case/, flash[:alert])
   end
 end

@@ -44,6 +44,33 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     assert_no_match(/unnamed channel/, response.body)
   end
 
+  test "a guard already on this case is offered but cannot be picked" do
+    guard = guard!(case_id: @kase.id)
+    look
+
+    assert_select %(input[name="standing_guard_id"][value="#{guard.id}"][disabled])
+    assert_match(/already on this case/, response.body)
+  end
+
+  test "a guard held elsewhere but logged here is greyed out too" do
+    other = make_case
+    guard = guard!(case_id: other.id)
+    post fd_case_actions_path(@kase),
+      params: { standing_guard_id: guard.id, target_user_id: "USUB" }
+    look
+
+    assert_select %(input[name="standing_guard_id"][value="#{guard.id}"][disabled])
+    assert_match(/already logged on this case/, response.body)
+  end
+
+  test "a guard on another case stays pickable here" do
+    other = make_case
+    guard = guard!(case_id: other.id)
+    look
+
+    assert_select %(input[name="standing_guard_id"][value="#{guard.id}"][disabled]), false
+  end
+
   test "nobody named yet offers nothing" do
     guard!
     look(target_user_id: "")

@@ -91,6 +91,52 @@ class FdActionThreadLockTest < ActionDispatch::IntegrationTest
     log(thread_guard_id: guard.id)
 
     assert_equal 1, actions.count
+    assert_match(/already on this case/, flash[:alert])
+  end
+
+  test "a lock already on the case is offered but cannot be picked" do
+    guard = lock!(case_id: @kase.id)
+    get fd_case_path(@kase, do: "action")
+    said = response.body
+
+    assert_match(/name="thread_guard_id" value="#{guard.id}"/, said)
+    assert_select %(input[name="thread_guard_id"][value="#{guard.id}"][disabled])
+    assert_match(/already on this case/, said)
+  end
+
+  test "a lock already on the case is refused even if the form is forced" do
+    guard = lock!(case_id: @kase.id)
+    log(thread_guard_id: guard.id)
+
+    assert_equal 0, actions.count
+    assert_match(/already on this case/, flash[:alert])
+  end
+
+  test "a lock held elsewhere but logged here is greyed out too" do
+    other = make_case
+    guard = lock!(case_id: other.id)
+    log(thread_guard_id: guard.id)
+    get fd_case_path(@kase, do: "action")
+
+    assert_select %(input[name="thread_guard_id"][value="#{guard.id}"][disabled])
+    assert_match(/already logged on this case/, response.body)
+  end
+
+  test "a lock on another case stays pickable here" do
+    other = make_case
+    guard = lock!(case_id: other.id)
+    get fd_case_path(@kase, do: "action")
+
+    assert_select %(input[name="thread_guard_id"][value="#{guard.id}"][disabled]), false
+  end
+
+  test "a lock logged here but held by another case is refused a second time" do
+    other = make_case
+    guard = lock!(case_id: other.id)
+    log(thread_guard_id: guard.id)
+    log(thread_guard_id: guard.id)
+
+    assert_equal 1, actions.count
     assert_match(/already logged on this case/, flash[:alert])
   end
 

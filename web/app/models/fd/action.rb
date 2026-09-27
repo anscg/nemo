@@ -37,6 +37,15 @@ module Fd
 
     def self.from_thread_lock?(type_key) = FROM_THREAD_LOCK.include?(type_key)
 
+    def self.guards_logged_on(case_ids)
+      live.where(case_id: case_ids).where.not(guard_id: nil).pluck(:guard_id).to_set
+    end
+
+    def self.thread_guards_logged_on(case_ids)
+      live.where(case_id: case_ids).where.not(thread_guard_id: nil)
+        .pluck(:thread_guard_id).to_set
+    end
+
     def reversed?
       reversed_at.present?
     end

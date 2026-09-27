@@ -533,6 +533,13 @@
   .opt-label { font-size: var(--t-body); font-weight: 500; color: var(--ink); }
   .opt-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--off); flex: none; }
   .opt:has(input:checked) .opt-dot { background: var(--accent); }
+  .opt:has(input:disabled), .opt:has(input:disabled):hover {
+    background: var(--sunk);
+    border-color: var(--line-soft);
+    cursor: not-allowed;
+  }
+  .opt:has(input:disabled) .opt-label { color: var(--ink-3); font-weight: 450; }
+  .opt:has(input:disabled) .opt-dot { background: var(--line); }
   .opt-why, .opt-note { font-size: var(--t-fine); color: var(--ink-4); }
 
   .chip, .mchip, .tag, .count-pill, .token {

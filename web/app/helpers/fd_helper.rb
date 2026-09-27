@@ -1436,6 +1436,10 @@ module FdHelper
     tag.span(said, class: "state #{tone}")
   end
 
+  def already_here_note(attached)
+    attached ? "already on this case" : "already logged on this case"
+  end
+
   def thread_lock_note(guard, case_id)
     said = [guard_standing_where(guard, case_id)]
     said << (guard.expires_at ? "lifts #{guard.expires_at.strftime("%-d %b")}" : "no end date")

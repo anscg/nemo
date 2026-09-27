@@ -8,7 +8,8 @@ module Fd
       @channels = ChannelNames.for(guards.map(&:channel_id))
 
       render partial: "fd/cases/standing", layout: false,
-        locals: { guards: guards, kase: kase, names: Names.for(named(guards)) }
+        locals: { guards: guards, kase: kase, names: Names.for(named(guards)),
+                  logged: Action.guards_logged_on(kase.family_ids) }
     end
 
     private
