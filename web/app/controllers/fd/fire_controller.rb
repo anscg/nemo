@@ -18,6 +18,7 @@ module Fd
       @guards = worst_first(MemberGuard.still_on.to_a)
       @orphaned = @guards.count(&:orphaned?)
       @names = Names.for(@guards.flat_map(&:people_named) + @guards.map(&:subject_id))
+      @channels = ChannelNames.for(@guards.map(&:channel_id))
     end
 
     private

@@ -22,6 +22,28 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     response.body.scan(/name="standing_guard_id" value="(\d*)"/).flatten
   end
 
+  def a_named_channel
+    Analytics::DimChannel.where.not(name: nil).first
+  end
+
+  test "a channel-scoped guard is named by its channel, not left unnamed" do
+    room = a_named_channel
+    guard!(kind: "channel_ban", channel_id: room.channel_id)
+    look
+
+    assert_match(/##{room.name}/, response.body)
+    assert_no_match(/unnamed channel/, response.body)
+  end
+
+  test "the case page names the channel a standing guard is scoped to" do
+    room = a_named_channel
+    guard!(kind: "channel_ban", channel_id: room.channel_id, case_id: @kase.id)
+    get fd_case_path(@kase, do: "action")
+
+    assert_match(/##{room.name}/, response.body)
+    assert_no_match(/unnamed channel/, response.body)
+  end
+
   test "nobody named yet offers nothing" do
     guard!
     look(target_user_id: "")

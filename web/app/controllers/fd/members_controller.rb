@@ -32,6 +32,7 @@ module Fd
       @rooms = SlackScan.channels(@user_id)
       @standing = MemberStanding.new(@record)
       @guards = @standing.in_force
+      @channels = ChannelNames.for(@guards.map(&:channel_id))
       @member_grant = @pane_grants[@user_id] || Authz::Grant.live.roles.find_by(user_id: @user_id)
     end
 
@@ -78,6 +79,7 @@ module Fd
       @rooms = SlackScan.channels(@user_id)
       @standing = MemberStanding.new(@record)
       @guards = @standing.in_force
+      @channels = ChannelNames.for(@guards.map(&:channel_id))
       render "drawer"
     end
 

@@ -5,6 +5,7 @@ module Fd
     def show
       kase = Case.find(params[:case_id])
       guards = MemberGuard.standing_on(params[:target_user_id])
+      @channels = ChannelNames.for(guards.map(&:channel_id))
 
       render partial: "fd/cases/standing", layout: false,
         locals: { guards: guards, kase: kase, names: Names.for(named(guards)) }

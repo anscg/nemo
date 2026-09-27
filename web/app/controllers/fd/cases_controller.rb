@@ -65,6 +65,7 @@ module Fd
       @channels = ChannelNames.for(@threads.map(&:channel_id) +
         @cited_messages.values.map(&:channel_id) + cited_channel_ids +
         @thread_guards.map(&:channel_id) + @thread_locks.map(&:channel_id) +
+        @action_standing.map(&:channel_id) +
         @actions.filter_map { |a| a.details["channel_id"] } +
         Array(@pane_channels))
       @said_counts = @thread_messages.group_by(&:author_user_id).transform_values(&:size)
