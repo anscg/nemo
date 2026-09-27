@@ -25,6 +25,7 @@ module Fd
 
     def action_objection
       return "pick what was done" unless FdHelper::ACTION_LABELS.key?(type_key)
+      return thread_lock_objection if Action.from_thread_lock?(type_key)
       return "say who it was directed at" if target_user_id.blank?
       return "#{target_user_id} is not a member id" unless target_user_id.match?(MEMBER_ID)
       if NEEDS_EXPIRY.include?(type_key)
@@ -58,6 +59,39 @@ module Fd
         reason: params[:reason].to_s.strip,
         category_key: chosen_category(kase),
         details: channel
+      )
+    end
+
+    def thread_lock_objection
+      return "pick which thread lock this is" if thread_lock.nil?
+      if Action.live.exists?(case_id: params[:case_id], thread_guard_id: thread_lock.id)
+        return "that thread lock is already logged on this case"
+      end
+
+      nil
+    end
+
+    def thread_lock
+      return @thread_lock if defined?(@thread_lock)
+
+      said = params[:thread_guard_id].to_s.presence
+      @thread_lock = said && ThreadGuard.still_on.locks.find_by(id: said)
+    end
+
+    def log_thread_lock(kase, guard)
+      was = guard.case_id
+      if guard.orphaned? && guard.attach_to!(kase.id)
+        audit(guard, "attached", before: { "case_id" => was },
+          after: { "case_id" => kase.id })
+      end
+
+      Action.create!(
+        case_id: kase.id, type_key: type_key, target_user_id: nil,
+        decided_by: current_account.user_id, performed_by: current_account.user_id,
+        performed_at: Time.current, source_app: Audit::SOURCE_APP,
+        expires_at: guard.expires_at, reason: guard.reason,
+        category_key: chosen_category(kase), thread_guard_id: guard.id,
+        details: { "channel_id" => guard.channel_id, "thread_ts" => guard.thread_ts }
       )
     end
 

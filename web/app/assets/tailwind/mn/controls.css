@@ -503,7 +503,7 @@
   }
 
   .opt-band { display: flex; flex-direction: column; gap: 4px; }
-  .optlist { display: flex; flex-direction: column; gap: 3px; }
+  .optlist { display: flex; flex-direction: column; gap: 6px; }
   .opt {
     display: flex;
     align-items: center;

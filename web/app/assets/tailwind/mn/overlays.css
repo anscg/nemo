@@ -531,7 +531,7 @@
   }
   .pick-field:has(.token) { height: auto; padding-block: 5px; }
   .pick-field:has(.token) .pick-input { height: 22px; }
-  .pick-field .token { max-width: 100%; }
+  .pick-field .token { max-width: 100%; height: 30px; margin: 3px; }
   .pick-field .token > span {
     min-width: 0;
     overflow: hidden;

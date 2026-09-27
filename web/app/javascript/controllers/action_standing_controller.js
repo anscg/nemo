@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static values = { url: String }
-  static targets = ["fields", "expiry", "channel"]
+  static targets = ["fields", "expiry", "channel", "locks", "aimed", "standing", "why", "cites"]
 
   connect() {
     this.fit()
@@ -32,7 +32,18 @@ export default class extends Controller {
     const kind = this.element.querySelector('select[name="type_key"]')?.selectedOptions[0]
     if (!kind) return
 
-    if (this.hasExpiryTarget) this.expiryTarget.hidden = kind.dataset.expires !== "true"
-    if (this.hasChannelTarget) this.channelTarget.hidden = kind.dataset.channel !== "true"
+    const onThread = kind.dataset.lock === "true"
+
+    if (this.hasExpiryTarget) {
+      this.expiryTarget.hidden = onThread || kind.dataset.expires !== "true"
+    }
+    if (this.hasChannelTarget) {
+      this.channelTarget.hidden = onThread || kind.dataset.channel !== "true"
+    }
+    if (this.hasLocksTarget) this.locksTarget.hidden = !onThread
+    if (this.hasAimedTarget) this.aimedTarget.hidden = onThread
+    if (this.hasStandingTarget) this.standingTarget.hidden = onThread
+    if (this.hasWhyTarget) this.whyTarget.hidden = onThread
+    if (this.hasCitesTarget) this.citesTarget.hidden = onThread
   }
 }

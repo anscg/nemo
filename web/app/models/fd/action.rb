@@ -9,6 +9,7 @@ module Fd
     NEEDS_CHANNEL = TABLE.select { |_key, row| row["channel"] == "required" }.keys.freeze
     TAKES_CHANNEL = TABLE.select { |_key, row| row["channel"].present? }.keys.freeze
     WORST_FIRST = TABLE.sort_by { |_key, row| row.fetch("weight") }.map(&:first).freeze
+    FROM_THREAD_LOCK = TABLE.select { |_key, row| row["thread_lock"] }.keys.freeze
     ENFORCE = TABLE.transform_values { |row| row["enforce"] }.compact.freeze
     ENFORCEABLE = ENFORCE.keys.freeze
 
@@ -16,6 +17,8 @@ module Fd
     belongs_to :cited_message, class_name: "Fd::ThreadMessage",
       foreign_key: :cites_message_id, optional: true
     belongs_to :guard, class_name: "Fd::MemberGuard", foreign_key: :guard_id,
+      optional: true, inverse_of: :actions
+    belongs_to :thread_guard, class_name: "Fd::ThreadGuard", foreign_key: :thread_guard_id,
       optional: true, inverse_of: :actions
 
     scope :live, -> { where(reversed_at: nil) }
@@ -32,11 +35,17 @@ module Fd
 
     def self.enforceable?(type_key) = ENFORCE.key?(type_key)
 
+    def self.from_thread_lock?(type_key) = FROM_THREAD_LOCK.include?(type_key)
+
     def reversed?
       reversed_at.present?
     end
 
     def enforceable? = self.class.enforceable?(type_key)
+
+    def from_thread_lock? = self.class.from_thread_lock?(type_key)
+
+    def aimed_at_member? = target_user_id.present?
 
     def cites?
       cites_message_id.present?

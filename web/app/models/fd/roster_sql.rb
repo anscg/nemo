@@ -22,6 +22,7 @@ module Fd
                  WHERE reversed_at IS NULL AND performed_at >= :prior_since
                ) AS priors
         FROM fd.actions
+        WHERE target_user_id IS NOT NULL
         GROUP BY target_user_id
       ),
       held AS (

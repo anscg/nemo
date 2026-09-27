@@ -41,14 +41,16 @@ class FdThreadGuardsTest < ActionDispatch::IntegrationTest
     assert_match(/state-crit/, said)
   end
 
-  test "a thread guard on another case is not shown here" do
+  test "a thread guard on another case is not listed here" do
     other = make_case
     guard!(case_id: other.id)
-    assert_no_match(/Thread locked/, actions_tab)
+    actions_tab
+    assert_select ".thread-guard-list", false
   end
 
-  test "a thread guard tied to no case is shown nowhere" do
+  test "a thread guard tied to no case is not listed here" do
     guard!(case_id: nil)
-    assert_no_match(/Thread locked/, actions_tab)
+    actions_tab
+    assert_select ".thread-guard-list", false
   end
 end

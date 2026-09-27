@@ -30,6 +30,10 @@
         <% end %>
       </span>
       <span class="lrow-right">
+        <% opened = action_thread_url(action) %>
+        <% if opened %>
+          <%= open_in_slack opened, css: "btn btn-sm" %>
+        <% end %>
         <% unless action.reversed? %>
           <%= opens_modal "case.reverse", "Reverse it", opens: "reverse-#{action.id}",
                 on: kase, css: "btn btn-sm btn-danger" %>

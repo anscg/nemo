@@ -106,11 +106,16 @@ class FdResolutionsTest < ActionDispatch::IntegrationTest
     assert_nil actions.sole.expires_at
   end
 
-  test "a locked thread may carry a channel but does not need one" do
+  test "a locked thread takes its channel from the lock, not the form" do
     sign_in_as(@me)
-    act(type_key: "locked_thread", channel_id: "C0266FRGV")
+    lock = Fd::ThreadGuard.create!(kind: "lock", channel_id: "C0266FRGV",
+      thread_ts: "1700000000.000100", opened_by: "UMOD", reason: "it was going nowhere",
+      state: "running", expires_at: 3.days.from_now)
+    act(type_key: "locked_thread", channel_id: "CELSE", thread_guard_id: lock.id)
+
     assert_equal "C0266FRGV", actions.sole.details["channel_id"]
-    assert_nil actions.sole.expires_at
+    assert_equal "1700000000.000100", actions.sole.details["thread_ts"]
+    assert_equal lock.id, actions.sole.thread_guard_id
   end
 
   test "an action type outside the eight is refused" do

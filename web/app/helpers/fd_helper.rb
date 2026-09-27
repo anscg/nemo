@@ -653,7 +653,8 @@ module FdHelper
     ACTION_LABELS.map do |key, label|
       [label, key, { data: {
         expires: Fd::Action::NEEDS_EXPIRY.include?(key),
-        channel: Fd::Action::TAKES_CHANNEL.include?(key)
+        channel: Fd::Action::TAKES_CHANNEL.include?(key),
+        lock: Fd::Action.from_thread_lock?(key)
       } }]
     end
   end
@@ -677,11 +678,10 @@ module FdHelper
   end
 
   def action_option_label(action)
-    [
-      action_label(action.type_key),
-      "on #{names[action.target_user_id]}",
-      on_day(action.performed_at)
-    ].join(" · ")
+    said = [action_label(action.type_key)]
+    said << "on #{names[action.target_user_id]}" if action.aimed_at_member?
+    said << on_day(action.performed_at)
+    said.join(" · ")
   end
 
   def lone_subject(kase)
@@ -1123,6 +1123,16 @@ module FdHelper
     "reversed #{on_day(action.reversed_at)} by #{names[action.reversed_by]}#{why}"
   end
 
+  def action_thread_url(action)
+    return nil unless action.from_thread_lock?
+
+    channel = action.details["channel_id"]
+    thread = action.details["thread_ts"]
+    return nil if channel.blank? || thread.blank?
+
+    slack_thread_url(channel, thread)
+  end
+
   def action_state_chip(action)
     return tag.span("reversed", class: "chip chip-off") if action.reversed?
     return tag.span("expired #{on_day(action.expires_at)}", class: "chip chip-off") if action.expired?
@@ -1148,7 +1158,7 @@ module FdHelper
 
   def action_sentence(action)
     channel = action.details["channel_id"]
-    parts = ["On ", member_link(action.target_user_id)]
+    parts = action.aimed_at_member? ? ["On ", member_link(action.target_user_id)] : ["On a thread"]
     parts << " in #{channel_label(channel)}" if channel.present?
     parts << ", until #{on_day(action.expires_at)}" if action.expires?
     parts << ". Set by "
@@ -1424,6 +1434,13 @@ module FdHelper
 
     said, tone = GUARD_CARRY_CHIP.fetch(guard.carry, [guard.carry, "state"])
     tag.span(said, class: "state #{tone}")
+  end
+
+  def thread_lock_note(guard, case_id)
+    said = [guard_standing_where(guard, case_id)]
+    said << (guard.expires_at ? "lifts #{guard.expires_at.strftime("%-d %b")}" : "no end date")
+    said << guard.reason.to_s.truncate(60)
+    said.join("  ·  ")
   end
 
   def guard_standing_where(guard, case_id)

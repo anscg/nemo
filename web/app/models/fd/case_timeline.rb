@@ -172,7 +172,7 @@ module Fd
 
     def action_detail(action)
       parts = []
-      unless subject_user_ids.include?(action.target_user_id)
+      if action.aimed_at_member? && !subject_user_ids.include?(action.target_user_id)
         parts << "on #{names[action.target_user_id]}"
       end
       parts << "taken by #{names[action.decided_by]}"

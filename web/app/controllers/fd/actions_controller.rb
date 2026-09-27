@@ -6,7 +6,8 @@ module Fd
 
     def create
       kase = Case.find(params[:case_id])
-      held = standing_guard
+      lock = Action.from_thread_lock?(type_key) ? thread_lock : nil
+      held = lock ? nil : standing_guard
 
       problem = held ? nil : action_objection
       if problem
@@ -15,10 +16,13 @@ module Fd
       end
 
       named = false
+      adopted = lock&.orphaned?
       writing do
-        named = name_a_subject(kase)
+        named = name_a_subject(kase) unless lock
         if held
           attach_standing(kase, held)
+        elsif lock
+          audit(log_thread_lock(kase, lock), "performed")
         else
           action = log_action(kase, Time.current)
           audit(action, "performed")
@@ -27,12 +31,20 @@ module Fd
       end
 
       redirect_to fd_case_path(kase, tab: "actions"),
-        notice: held ? attached_notice(kase, held) : logged_notice(kase, named)
+        notice: notice_for(kase, held: held, lock: lock, adopted: adopted, named: named)
     end
 
     private
 
+    def notice_for(kase, held:, lock:, adopted:, named:)
+      return attached_notice(kase, held) if held
+      return locked_notice(kase, adopted) if lock
+
+      logged_notice(kase, named)
+    end
+
     def name_a_subject(kase)
+      return false if target_user_id.blank?
       return false if kase.subject_user_ids.include?(target_user_id)
 
       ActiveRecord::Base.transaction(requires_new: true) do
@@ -46,6 +58,11 @@ module Fd
     def attached_notice(kase, guard)
       said = FdHelper::ACTION_LABELS.fetch(guard.kind, guard.kind).downcase
       "the #{said} already standing on @#{guard.subject_id} is now on case #{kase.id}"
+    end
+
+    def locked_notice(kase, adopted)
+      said = "thread lock logged on case #{kase.id}"
+      adopted ? "#{said}, and the thread is now on this case" : said
     end
 
     def logged_notice(kase, named)

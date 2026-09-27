@@ -1,4 +1,4 @@
-<div class="list">
+<div class="list thread-guard-list">
   <% guards.each do |guard| %>
     <div class="lrow <%= "is-reversed" unless guard.still_on? %>">
       <span class="evdot <%= guard.failed? ? "crit" : "act" %>" aria-hidden="true">

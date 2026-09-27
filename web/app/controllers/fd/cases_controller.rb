@@ -27,6 +27,7 @@ module Fd
       @actions = Action.where(case_id: family).oldest_first.to_a
       @live_actions = @actions.reject(&:reversed?)
       @thread_guards = ThreadGuard.for_case(family).newest_first.to_a
+      @thread_locks = ThreadGuard.pickable_locks(family)
       subjects = @case.subject_user_ids
       @action_standing = MemberGuard.standing_on(
         @people.chosen&.user_id || (subjects.first if subjects.one?)
@@ -63,6 +64,8 @@ module Fd
       @cited_shares = IntakeShare.for_messages(@conversation_said.map(&:id))
       @channels = ChannelNames.for(@threads.map(&:channel_id) +
         @cited_messages.values.map(&:channel_id) + cited_channel_ids +
+        @thread_guards.map(&:channel_id) + @thread_locks.map(&:channel_id) +
+        @actions.filter_map { |a| a.details["channel_id"] } +
         Array(@pane_channels))
       @said_counts = @thread_messages.group_by(&:author_user_id).transform_values(&:size)
       @person_priors = Case.prior_counts_for(@participants.map(&:user_id))

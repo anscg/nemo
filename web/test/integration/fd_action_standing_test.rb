@@ -138,14 +138,18 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     get fd_case_path(bare, do: "action")
     assert_no_match(/name="standing_guard_id"/, response.body)
   end
-  test "each kind carries whether it expires and whether it takes a channel" do
+  test "each kind carries whether it expires, takes a channel, or reads a lock" do
     get fd_case_path(@kase, do: "action")
     said = response.body
 
-    assert_match(/data-expires="false" data-channel="false" value="warning"/, said)
-    assert_match(/data-expires="true" data-channel="false" value="shush"/, said)
-    assert_match(/data-expires="true" data-channel="true" value="channel_ban"/, said)
-    assert_match(/data-expires="false" data-channel="false" value="perma_ban"/, said)
+    assert_match(/data-expires="false" data-channel="false" data-lock="false" value="warning"/,
+      said)
+    assert_match(/data-expires="true" data-channel="false" data-lock="false" value="shush"/, said)
+    assert_match(/data-expires="true" data-channel="true" data-lock="false" value="channel_ban"/,
+      said)
+    assert_match(
+      /data-expires="false" data-channel="false" data-lock="true" value="locked_thread"/, said
+    )
   end
 
   test "the date and channel start hidden and are shaped by the kind" do

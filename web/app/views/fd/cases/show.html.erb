@@ -282,7 +282,7 @@
   <%= form_with url: fd_case_actions_path(@case), method: :post, html: { autocomplete: "off" } do %>
     <div class="modal-body">
       <%= render "action_fields", kase: @case, flagged: @flagged_messages, names: names,
-              standing: @action_standing,
+              standing: @action_standing, thread_locks: @thread_locks,
               target: @people.chosen&.user_id || lone_subject(@case) %>
 
     </div>

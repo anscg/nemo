@@ -31,7 +31,7 @@ actions:
       carry: reactive
   locked_thread:
     label: Locked thread
-    channel: optional
+    thread_lock: true
     weight: 7
   dm:
     label: DM
