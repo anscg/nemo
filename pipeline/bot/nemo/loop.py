@@ -4,7 +4,7 @@ import threading
 
 from bot.core import loops, session
 from bot.nemo import channel, channelguards, channels, chat, guards, guardwork, memberguards
-from bot.nemo.carriers import shush
+from bot.nemo import carriers
 
 log = logging.getLogger("bot.nemo")
 
@@ -66,7 +66,7 @@ def take_a_seat(client, channel_id):
 
 def take_up(client, guard):
     with session() as conn:
-        shush.take_up(client, conn, guard)
+        carriers.take_up(client, conn, guard)
 
 
 def apart(*doing):
@@ -134,7 +134,7 @@ def once(desk, channel_id=None):
     for guard_id in lifting:
         apart((f"lifting guard {guard_id}", lambda id=guard_id: guardwork.lift_lock(client, id)))
     for guard in taking_up:
-        apart((f"taking up shush {guard['id']}",
+        apart((f"taking up {guard['kind']} {guard['id']}",
                lambda one=guard: take_up(client, one)))
     apart(
         ("clearing what the guard could not remove", lambda: guardwork.sweep_removals(client)),
@@ -178,7 +178,7 @@ def start(desk, stopping, channel_id=None):
                 memberguards.refresh(conn)
                 taking_up = memberguards.uncarried(conn)
             for guard in taking_up:
-                apart((f"taking up shush {guard['id']}",
+                apart((f"taking up {guard['kind']} {guard['id']}",
                        lambda one=guard: take_up(desk.client, one)))
         elif channel_name == CONVERSATION:
             apart(("catching up", lambda: desk.caught_up(told)),

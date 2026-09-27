@@ -201,16 +201,16 @@ def settled(conn, action_id, said, standing, by):
     return guard_id
 
 
-LIVE_OF_KIND = """
-SELECT id, subject_id, channel_id, reason, expires_at, carry, carried_by
+LIVE_GUARDS = """
+SELECT id, kind, subject_id, channel_id, reason, expires_at, carry, carried_by
 FROM fd.member_guards
-WHERE kind = %s AND state = 'live'
+WHERE state = 'live'
 """
 
 UNCARRIED = """
-SELECT id, subject_id, channel_id, reason, expires_at
+SELECT id, kind, subject_id, channel_id, reason, expires_at
 FROM fd.member_guards
-WHERE kind = %s AND state = 'live' AND carry = 'pending' AND carried_by = 'nemo'
+WHERE state = 'live' AND carry = 'pending' AND carried_by = 'nemo'
 ORDER BY opened_at LIMIT 20
 """
 
@@ -240,39 +240,52 @@ SELECT count(*) FROM fd.member_guard_events
 WHERE guard_id = %s AND verb = %s AND at > now() - %s::interval
 """
 
-WATCHED = ("id", "subject_id", "channel_id", "reason", "expires_at", "carry", "carried_by")
+WATCHED = ("id", "kind", "subject_id", "channel_id", "reason", "expires_at",
+           "carry", "carried_by")
 
-_held = {}
+WANTED = ("id", "kind", "subject_id", "channel_id", "reason", "expires_at")
+
+_shushes = {}
+_bans = {}
 _loaded = False
 _lock = threading.Lock()
 
 
-def refresh(conn, kind=SHUSH):
+def refresh(conn):
     global _loaded
-    found = {
-        row[1]: dict(zip(WATCHED, row))
-        for row in conn.execute(LIVE_OF_KIND, (kind,)).fetchall()
-    }
+    shushes, bans = {}, {}
+    for row in conn.execute(LIVE_GUARDS).fetchall():
+        one = dict(zip(WATCHED, row))
+        if one["kind"] == SHUSH:
+            shushes[one["subject_id"]] = one
+        elif one["kind"] == CHANNEL_BAN:
+            bans[(one["subject_id"], one["channel_id"])] = one
+
     with _lock:
-        _held.clear()
-        _held.update(found)
+        _shushes.clear()
+        _shushes.update(shushes)
+        _bans.clear()
+        _bans.update(bans)
         _loaded = True
-    return len(found)
+    return len(shushes) + len(bans)
 
 
 def shushed(subject_id):
     with _lock:
         if not _loaded:
             return None
-        return _held.get(subject_id)
+        return _shushes.get(subject_id)
 
 
-def uncarried(conn, kind=SHUSH):
-    return [
-        {"id": row[0], "subject_id": row[1], "channel_id": row[2],
-         "reason": row[3], "expires_at": row[4]}
-        for row in conn.execute(UNCARRIED, (kind,)).fetchall()
-    ]
+def banned(subject_id, channel_id):
+    with _lock:
+        if not _loaded:
+            return None
+        return _bans.get((subject_id, channel_id))
+
+
+def uncarried(conn):
+    return [dict(zip(WANTED, row)) for row in conn.execute(UNCARRIED).fetchall()]
 
 
 def holding(conn, guard_id):

@@ -4,7 +4,7 @@ from slack_bolt import App
 from slack_sdk import WebClient
 
 from bot.nemo import channel, command, handlers, surface
-from bot.nemo.carriers import shush  # noqa: F401
+from bot.nemo.carriers import channel_ban, shush  # noqa: F401
 from lib.slack_client import RETRY_HANDLERS
 from bot.nemo.surface import (
     bot_watch,  # noqa: F401
