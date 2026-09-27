@@ -20,7 +20,6 @@ ELSEWHERE = "elsewhere"
 HERE = "here"
 
 CARRY = "carry"
-BY_HAND = "by_hand"
 ADOPT = "adopt"
 EXTEND = "extend"
 RECORD = "record"
@@ -168,10 +167,7 @@ def settle_options(said, standing):
 
     reads = standing.get("reads") or UNGUARDED
     if reads == UNGUARDED:
-        return [
-            (CARRY, "Take action"),
-            (BY_HAND, "Already taken (records only)"),
-        ]
+        return []
     if reads == ORPHANED:
         return [
             (ADOPT, "Attach it to this case"),

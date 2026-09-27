@@ -58,6 +58,13 @@ module Fd
         reads: guard ? guard.reads_for(case_id) : UNGUARDED)
     end
 
+    def self.standing_on(subject_id)
+      said = subject_id.to_s.upcase.presence
+      return [] if said.nil?
+
+      still_on.for_subject(said).oldest_first.to_a
+    end
+
     def self.standing_for(subject_id, kind:, channel_id: nil)
       still_on.find_by(subject_id: subject_id, kind: kind, channel_id: channel_id)
     end

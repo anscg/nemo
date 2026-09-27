@@ -14,97 +14,85 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     }.merge(over))
   end
 
-  def warned?
-    response.body.include?("flag-mid") || response.body.include?("flag-crit")
-  end
-
   def look(**params)
-    get fd_case_standing_path(@kase), params: {
-      type_key: "shush", target_user_id: "USUB"
-    }.merge(params)
+    get fd_case_standing_path(@kase), params: { target_user_id: "USUB" }.merge(params)
   end
 
-  test "a record only kind never warns, whatever is standing" do
+  def offered
+    response.body.scan(/name="standing_guard_id" value="(\d*)"/).flatten
+  end
+
+  test "nobody named yet offers nothing" do
     guard!
-    look(type_key: "warning")
+    look(target_user_id: "")
     assert_response :success
-    assert_not warned?
+    assert_empty offered
   end
 
-  test "nothing standing warns about nothing" do
+  test "somebody with nothing standing is offered nothing" do
     look
     assert_response :success
-    assert_not warned?
+    assert_empty offered
   end
 
-  test "a guard on nobody's case says it sits on no case" do
+  test "everything standing on them is offered, whatever kind" do
+    one = guard!
+    two = guard!(kind: "channel_ban", channel_id: "C0266FRGV")
+    look
+
+    assert_equal [one.id.to_s, two.id.to_s, ""], offered
+    assert_match(/None of these/, response.body)
+  end
+
+  test "a lifted guard is not offered" do
+    guard!(state: "lifted", lifted_at: Time.current, lifted_by: "UMOD")
+    look
+    assert_empty offered
+  end
+
+  test "one still being lifted is still offered" do
+    held = guard!(state: "lifting", lifted_by: "UMOD")
+    look
+    assert_includes offered, held.id.to_s
+  end
+
+  test "each one says which case it sits on" do
     guard!
     look
-    assert warned?
     assert_match(/on no case/, response.body)
-    assert_match(/nemo has not carried it yet/, response.body)
-  end
 
-  test "a guard on another case links to that case" do
     other = make_case
-    guard!(case_id: other.id)
+    Fd::MemberGuard.update_all(case_id: other.id)
     look
-    assert_match(/under case #{other.id}/, response.body)
-    assert_match fd_case_path(other.id), response.body
+    assert_match(/on case #{other.id}/, response.body)
   end
 
-  test "a guard on this case says so and does not link away" do
+  test "one on this case says so" do
     guard!(case_id: @kase.id)
     look
     assert_match(/on this case/, response.body)
-    assert_no_match(/under case/, response.body)
   end
 
-  test "a workspace guard is not found by a channel scoped kind" do
-    guard!
-    look(type_key: "channel_ban", channel_id: "C0266FRGV")
-    assert_not warned?
-  end
-
-  test "a channel ban is only found in the channel it was made in" do
-    guard!(kind: "channel_ban", channel_id: "C0266FRGV")
-    look(type_key: "channel_ban", channel_id: "C0266FRGV")
-    assert warned?
-
-    look(type_key: "channel_ban", channel_id: "CSOMEWHERE")
-    assert_not warned?
-  end
-
-  test "a lifted guard is not standing any more" do
-    guard!(state: "lifted", lifted_at: Time.current, lifted_by: "UMOD")
+  test "the note says which case and until when, and nothing about nemo" do
+    guard!(carry: "failed", expires_at: Time.utc(2026, 3, 10))
     look
-    assert_not warned?
-  end
 
-  test "a guard still being lifted is still standing" do
-    guard!(state: "lifting", lifted_by: "UMOD")
-    look
-    assert warned?
-  end
-
-  test "a guard nemo has dropped is called out as not holding" do
-    guard!(carry: "failed")
-    look
-    assert_match(/nemo is not holding it/, response.body)
-    assert_match(/flag-crit/, response.body)
-  end
-
-  test "a guard done by hand is not blamed on nemo" do
-    guard!(carried_by: "by_hand", carry: "held")
-    look
-    assert_match(/done by hand/, response.body)
+    assert_match(/on no case/, response.body)
+    assert_match(/until 10 Mar/, response.body)
     assert_no_match(/nemo/, response.body)
   end
 
-  test "a guard with no end date says that instead of a date" do
+  test "one with no end date says so" do
     guard!(expires_at: nil)
     look
-    assert_match(/with no end date/, response.body)
+    assert_match(/no end date/, response.body)
+  end
+
+  test "the list is asked for by member alone, not by kind" do
+    guard!(kind: "channel_ban", channel_id: "C0266FRGV")
+    look
+    assert_equal 1, offered.count { |one| one.present? },
+      "a channel ban shows even though no kind was named"
   end
 
   test "a signed out visitor is told nothing about who is standing" do
@@ -112,39 +100,77 @@ class FdActionStandingTest < ActionDispatch::IntegrationTest
     delete logout_path
     look
     assert_redirected_to login_path
-    assert_not warned?
-  end
-  def offered
-    response.body.scan(/name="settle" value="([a-z_]+)"/).flatten
-  end
-
-  def preferred
-    response.body[/name="settle" value="([a-z_]+)" checked/, 1]
-  end
-
-  test "nothing standing asks whether nemo carries it" do
-    look
-    assert_equal %w[carry by_hand], offered
-    assert_equal "carry", preferred
-  end
-
-  test "a record only kind is never asked" do
-    guard!
-    look(type_key: "warning")
     assert_empty offered
   end
-
-  test "an orphan is offered for adoption, and that is the default" do
+  test "the modal asks who first, then what is standing, then the fields" do
     guard!
-    look
-    assert_equal %w[adopt record], offered
-    assert_equal "adopt", preferred
+    get fd_case_path(@kase, do: "action")
+    said = response.body
+
+    assert_operator said.index('data-member-picker-name-value="target_user_id"'), :<,
+      said.index('turbo-frame id="action-standing"')
+    assert_operator said.index('turbo-frame id="action-standing"'), :<,
+      said.index('data-action-standing-target="fields"')
   end
 
-  test "a guard under another case defaults to leaving it alone" do
-    guard!(case_id: make_case.id)
+  test "the fields collapse under a chosen guard, and the frame reloads on a member" do
+    get fd_case_path(@kase, do: "action")
+    said = response.body
+
+    assert_match(/data-action-standing-target="fields"/, said)
+    assert_match(/action-standing#fit/, said) if Fd::MemberGuard.any?
+    assert_match(/member-picker:picked->action-standing#look/, said)
+    assert_match(/turbo:frame-load->action-standing#fit/, said)
+  end
+
+  test "a case with one subject already shows what is standing on them" do
+    kase = make_case(subject: "USUB")
+    guard!
+    get fd_case_path(kase, do: "action")
+
+    assert_match(/None of these/, response.body)
+    assert_match(/name="standing_guard_id"/, response.body)
+  end
+
+  test "a case with no subject asks nothing until somebody is named" do
+    bare = make_case(subject: nil)
+    guard!
+    get fd_case_path(bare, do: "action")
+    assert_no_match(/name="standing_guard_id"/, response.body)
+  end
+  test "each kind carries whether it expires and whether it takes a channel" do
+    get fd_case_path(@kase, do: "action")
+    said = response.body
+
+    assert_match(/data-expires="false" data-channel="false" value="warning"/, said)
+    assert_match(/data-expires="true" data-channel="false" value="shush"/, said)
+    assert_match(/data-expires="true" data-channel="true" value="channel_ban"/, said)
+    assert_match(/data-expires="false" data-channel="false" value="perma_ban"/, said)
+  end
+
+  test "the date and channel start hidden and are shaped by the kind" do
+    get fd_case_path(@kase, do: "action")
+    said = response.body
+
+    assert_match(/data-action-standing-target="expiry" hidden/, said)
+    assert_match(/data-action-standing-target="channel" hidden/, said)
+    assert_match(/action-standing#shape/, said)
+  end
+  test "the channel field searches rather than asking for an id" do
+    get fd_case_path(@kase, do: "action")
+    said = response.body
+
+    assert_match(/data-controller="channel-picker"/, said)
+    assert_match(/data-channel-picker-name-value="channel_id"/, said)
+    assert_no_match(/placeholder="C0266FRGV"/, said)
+  end
+
+  test "each option is a house radio row, not a browser one" do
+    guard!
     look
-    assert_equal %w[extend record], offered
-    assert_equal "record", preferred
+
+    assert_match(/class="opt-dot"/, response.body)
+    assert_match(/class="opt-label"/, response.body)
+    assert_match(/class="opt-note"/, response.body)
   end
 end

@@ -28,19 +28,6 @@
       </label>
       <%= field_wrong(:reason) %>
 
-      <div class="field-label">
-        <span>Enforcement</span>
-        <div class="segmented seg-radio">
-          <label>
-            <%= radio_button_tag :settle, Fd::MemberGuard::CARRY, true, id: nil %>
-            Take action
-          </label>
-          <label>
-            <%= radio_button_tag :settle, Fd::MemberGuard::ALREADY_DONE, false, id: nil %>
-            Already taken (records only)
-          </label>
-        </div>
-      </div>
     </div>
     <div class="modal-foot">
       <button type="button" class="btn btn-ghost" data-action="click->modal#shut">Cancel</button>

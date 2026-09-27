@@ -96,7 +96,7 @@ module Fd
         kind: kind, subject_id: subject_id,
         channel_id: kind == MemberGuard::CHANNEL_BAN ? channel_id : nil,
         by: current_account.user_id, reason: params[:reason].to_s.strip,
-        expires_at: expiry, by_hand: params[:settle].to_s == MemberGuard::ALREADY_DONE
+        expires_at: expiry
       )
       audit(guard, "opened") if guard
       guard

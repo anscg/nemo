@@ -185,7 +185,6 @@ def settled(conn, action_id, said, standing, by):
             else None,
             case_id=case_id,
             expires_at=expires_at,
-            by_hand=chose == action.BY_HAND,
         )
     elif chose == action.ADOPT:
         guard_id = attach(conn, found["id"], case_id, by)
@@ -306,3 +305,75 @@ def happened(conn, guard_id, subject_id, channel_id, verb,
 
 def lately(conn, guard_id, verb, within):
     return conn.execute(LATELY, (guard_id, verb, within)).fetchone()[0]
+
+
+NEMO = "nemo"
+
+BACKOFF_CAP = 30
+
+LAPSED = """
+SELECT id, kind, subject_id, channel_id, reason, expires_at
+FROM fd.member_guards
+WHERE state = 'live' AND expires_at IS NOT NULL AND expires_at <= now()
+ORDER BY expires_at LIMIT 20
+"""
+
+DROPPED_AWHILE = """
+SELECT id, kind, subject_id, channel_id, reason, expires_at
+FROM fd.member_guards
+WHERE state = 'live' AND carry = 'failed' AND carried_by = 'nemo'
+  AND updated_at <= now() - (least(attempts, %s) * interval '1 minute')
+ORDER BY updated_at LIMIT 20
+"""
+
+LET_GO = """
+UPDATE fd.member_guards
+SET state = 'lifted', lifted_at = now(), lifted_by = %s, lift_reason = %s, updated_at = now()
+WHERE id = %s AND state = 'live'
+RETURNING id
+"""
+
+ENDING_UNTOLD = """
+SELECT g.id, g.kind, g.subject_id, g.channel_id, g.reason, g.expires_at, g.case_id
+FROM fd.member_guards g
+WHERE g.state = 'live' AND g.expires_at IS NOT NULL
+  AND g.expires_at >= now() AND g.expires_at < now() + %s::interval
+  AND NOT EXISTS (
+    SELECT 1 FROM fd.member_guard_events e
+    WHERE e.guard_id = g.id AND e.verb = 'told' AND e.detail = %s
+      AND e.at > now() - interval '20 hours'
+  )
+ORDER BY g.expires_at
+"""
+
+
+def lapsed(conn):
+    return [dict(zip(WANTED, row)) for row in conn.execute(LAPSED).fetchall()]
+
+
+def dropped_awhile(conn):
+    return [
+        dict(zip(WANTED, row))
+        for row in conn.execute(DROPPED_AWHILE, (BACKOFF_CAP,)).fetchall()
+    ]
+
+
+def let_go(conn, guard_id, by, why):
+    row = conn.execute(LET_GO, (by, why, guard_id)).fetchone()
+    if row is None:
+        return False
+
+    audit.record(conn, "member_guard", guard_id, "lifted", by,
+                 before={"state": "live"}, after={"state": "lifted", "lift_reason": why})
+    return True
+
+
+ENDING = "ending"
+
+
+def ending_untold(conn, within):
+    fields = (*WANTED, "case_id")
+    return [
+        dict(zip(fields, row))
+        for row in conn.execute(ENDING_UNTOLD, (within, ENDING)).fetchall()
+    ]

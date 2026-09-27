@@ -58,8 +58,8 @@ def test_a_record_only_kind_is_never_asked():
                                                       enforceable=False)) == []
 
 
-def test_nothing_standing_asks_whether_nemo_carries_it():
-    assert options(said(), standing(None, action.UNGUARDED)) == [action.CARRY, action.BY_HAND]
+def test_nothing_standing_is_not_asked_it_is_simply_taken():
+    assert options(said(), standing(None, action.UNGUARDED)) == []
 
 
 def test_an_orphan_is_offered_for_adoption_first():
@@ -96,11 +96,16 @@ def test_the_choice_sits_below_the_date_it_talks_about():
     assert shown.index(action.UNTIL) < shown.index(action.SETTLE)
 
 
-def test_a_submit_that_never_saw_the_choice_is_sent_back():
+def test_a_submit_with_nothing_standing_goes_straight_through():
     shown = {action.TARGET, action.KIND, action.UNTIL, action.REASON}
-    assert action.unasked(said(), shown, standing(None, action.UNGUARDED))
-    assert not action.unasked(said(), shown | {action.SETTLE},
-                              standing(None, action.UNGUARDED))
+    assert not action.unasked(said(), shown, standing(None, action.UNGUARDED))
+
+
+def test_a_submit_that_never_saw_an_orphan_is_sent_back():
+    shown = {action.TARGET, action.KIND, action.UNTIL, action.REASON, action.STANDING}
+    held = standing(guard(), action.ORPHANED)
+    assert action.unasked(said(), shown, held)
+    assert not action.unasked(said(), shown | {action.SETTLE}, held)
 
 
 def test_extending_without_a_date_is_refused():
@@ -120,11 +125,10 @@ def test_carrying_it_opens_a_guard_nemo_has_not_done_yet():
     assert conn.did("UPDATE fd.actions")[0] == (9, 1)
 
 
-def test_one_already_done_by_hand_is_opened_as_held():
+def test_nothing_standing_always_opens_a_guard_nemo_will_carry():
     conn = Conn({"INSERT INTO fd.member_guards": (9,), "UPDATE fd.actions": (1,)})
-    memberguards.settled(conn, 1, said(settle=action.BY_HAND),
-                         standing(None, action.UNGUARDED), MOD)
-    assert conn.did("INSERT INTO fd.member_guards")[0][7:9] == ("by_hand", "held")
+    memberguards.settled(conn, 1, said(), standing(None, action.UNGUARDED), MOD)
+    assert conn.did("INSERT INTO fd.member_guards")[0][7:9] == ("nemo", "pending")
 
 
 def test_a_workspace_guard_is_opened_without_a_channel():

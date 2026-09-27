@@ -5,6 +5,7 @@ import threading
 from bot.core import loops, session
 from bot.nemo import channel, channelguards, channels, chat, guards, guardwork, memberguards
 from bot.nemo import carriers
+from bot.nemo.carriers import sweep
 
 log = logging.getLogger("bot.nemo")
 
@@ -139,6 +140,9 @@ def once(desk, channel_id=None):
     apart(
         ("clearing what the guard could not remove", lambda: guardwork.sweep_removals(client)),
         ("resetting sessions the guard has earned", guardwork.sweep_strikes),
+        ("lifting what has run out", lambda: sweep.sweep_lapsed(client)),
+        ("taking up what it dropped", lambda: sweep.sweep_dropped(client)),
+        ("saying what is ending soon", lambda: sweep.sweep_ending(client)),
     )
 
     return posted, drawn, carried

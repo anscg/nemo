@@ -516,6 +516,9 @@
     transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
   }
   .opt:hover { border-color: var(--ink-4); }
+  .fieldset { display: contents; }
+  .opt > input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+  .opt-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .modal-body > .opt,
   .modal-body > .opt:hover,
   .modal-body > .opt:has(input:checked) {

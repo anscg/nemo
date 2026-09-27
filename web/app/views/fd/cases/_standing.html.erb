@@ -1,25 +1,27 @@
 <%= turbo_frame_tag "action-standing" do %>
-  <% guard = standing&.guard %>
-  <% if guard %>
-    <div class="flag <%= guard.failed? ? "flag-crit" : "flag-mid" %>">
-      <span class="flag-icon" aria-hidden="true">◆</span>
-      <div>
-        <b><%= guard_standing_line(guard, kase.id, names) %></b>
-        <span class="sub"><%= guard_footnote(guard, names) %></span>
-      </div>
-    </div>
-  <% end %>
-  <% options = settle_options(standing, type_key) %>
-  <% if options.any? %>
+  <% if guards.any? %>
     <div class="field-label">
-      <span>Enforcement</span>
-      <div class="segmented seg-radio">
-        <% options.each do |value, said| %>
-          <label>
-            <%= radio_button_tag :settle, value, value == settle_default(standing), id: nil %>
-            <%= said %>
+      <span>Already standing on them</span>
+      <div class="optlist">
+        <% guards.each do |guard| %>
+          <label class="opt">
+            <%= radio_button_tag :standing_guard_id, guard.id, false, id: nil,
+                  data: { action: "change->action-standing#fit" } %>
+            <span class="opt-dot" aria-hidden="true"></span>
+            <span class="opt-body">
+              <span class="opt-label"><%= guard_kind_line(guard) %></span>
+              <span class="opt-note"><%= guard_option_note(guard, kase.id) %></span>
+            </span>
           </label>
         <% end %>
+        <label class="opt">
+          <%= radio_button_tag :standing_guard_id, "", true, id: nil,
+                data: { action: "change->action-standing#fit" } %>
+          <span class="opt-dot" aria-hidden="true"></span>
+          <span class="opt-body">
+            <span class="opt-label">None of these, take a new action</span>
+          </span>
+        </label>
       </div>
     </div>
   <% end %>

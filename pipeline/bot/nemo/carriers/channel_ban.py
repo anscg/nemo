@@ -17,6 +17,8 @@ IN_CHANNEL = (
     "Your message was removed. You are banned from this channel for {why}, {until}."
 )
 
+OVER = "Your ban from <#{room}> has ended. You can join it again."
+
 
 def put_out(conn, guard):
     how = privileged.kick(guard["channel_id"], guard["subject_id"])
@@ -44,6 +46,10 @@ def take_up(client, conn, guard):
     log.info("nemo: channel ban %s is now held on %s in %s",
              guard["id"], guard["subject_id"], guard["channel_id"])
     return True
+
+
+def let_go(client, conn, guard):
+    carrying.tell_them(client, conn, guard, OVER.format(room=guard["channel_id"]))
 
 
 def again(conn, guard, why):

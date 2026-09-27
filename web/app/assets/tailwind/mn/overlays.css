@@ -149,7 +149,11 @@
   .modal-sm { --modal-w: 420px; }
   .modal-lg { --modal-w: 760px; }
   .modal-xl { --modal-w: 980px; }
-  .modal > form { display: flex; flex-direction: column; min-height: 0; }
+  .modal > form, .modal *:has(.modal-body) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
   .modal-head {
     position: relative;
     display: flex;
@@ -188,8 +192,8 @@
   .modal-body .pick-pop, .modal-body .picker-pop, .modal-body .mention-pop { position: absolute; }
   .modal-body:has(> .field-label > .pick > .pick-pop:not([hidden])),
   .modal-body:has(.pick-pop:not([hidden])),
-  .modal-body:has(.picker-pop:not([hidden])) { overflow: visible; }
-  .modal:has(.pick-pop:not([hidden])), .modal:has(.picker-pop:not([hidden])) { overflow: visible; }
+  .modal-body:has(details.picker[open]) { overflow: visible; }
+  .modal:has(.pick-pop:not([hidden])), .modal:has(details.picker[open]) { overflow: visible; }
   .modal .segmented { align-self: flex-start; }
   .modal-foot {
     display: flex;
@@ -521,13 +525,21 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 5px 6px;
     padding: 0 10px;
   }
-  .pick-field:has(.token-plain) { height: auto; padding-block: 5px; }
-  .pick-field:has(.token-plain) .pick-input { height: 22px; }
+  .pick-field:has(.token) { height: auto; padding-block: 5px; }
+  .pick-field:has(.token) .pick-input { height: 22px; }
+  .pick-field .token { max-width: 100%; }
+  .pick-field .token > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .pick-field .pick-input {
-    width: 100%;
+    flex: 1 1 120px;
     height: calc(var(--ctl-h) - 2px);
     padding: 0;
     border: 0;

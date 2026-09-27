@@ -36,12 +36,6 @@ class FdMemberGuardsTest < ActionDispatch::IntegrationTest
     assert_equal 1, told("opened").count
   end
 
-  test "one already done by hand is held as held" do
-    hold(settle: Fd::MemberGuard::ALREADY_DONE)
-    assert guards.sole.by_hand?
-    assert guards.sole.held?
-  end
-
   test "a channel ban needs a channel, a shush ignores one" do
     hold(kind: "channel_ban")
     assert_empty guards
@@ -147,15 +141,20 @@ class FdMemberGuardsTest < ActionDispatch::IntegrationTest
     get fd_member_path("USUB")
 
     assert_match(/data-controller="picker menu"/, response.body)
-    assert_match(/segmented seg-radio/, response.body)
     assert_match(/data-guard-form-target="channel" hidden/, response.body)
     assert_match(/data-controller="channel-picker"/, response.body)
   end
 
-  test "the enforcement choice is worded the same on both surfaces" do
+  test "nothing is asked about enforcement, since holding it is the point" do
     get fd_member_path("USUB")
-    assert_match(/Take action/, response.body)
-    assert_match(/Already taken \(records only\)/, response.body)
+    assert_no_match(/Already taken/, response.body)
+    assert_no_match(/name="settle"/, response.body)
+  end
+
+  test "what it holds is always carried by nemo" do
+    hold
+    assert_equal "nemo", guards.sole.carried_by
+    assert_equal "pending", guards.sole.carry
   end
 
   test "channels can be searched from inside the fire engine" do

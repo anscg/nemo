@@ -61,61 +61,50 @@ module Fd
       )
     end
 
-    def settle_choice
-      params[:settle].to_s.presence || MemberGuard::RECORD
+    def standing_guard
+      said = params[:standing_guard_id].to_s.presence
+      return nil if said.nil?
+
+      MemberGuard.still_on.for_subject(target_user_id).find_by(id: said)
     end
 
-    def standing_for(kase)
-      MemberGuard.settle(type_key, target_user_id, case_id: kase.id, channel_id: guard_channel)
-    end
-
-    def guard_channel
+    def guard_channel(type_key)
       return nil unless Action.guard_scope(type_key) == "channel"
 
       channel_id.presence
     end
 
-    def settle_guard(kase, action, standing)
-      return nil unless standing.enforceable?
-
-      guard = if standing.guard.nil?
-        open_guard(kase)
-      elsif settle_choice == MemberGuard::ADOPT
-        attached(standing.guard, kase)
-      elsif settle_choice == MemberGuard::EXTEND
-        extended(standing.guard)
-      elsif standing.reads == MemberGuard::HERE
-        standing.guard
+    def attach_standing(kase, guard)
+      was = guard.case_id
+      if guard.orphaned? && guard.attach_to!(kase.id)
+        audit(guard, "attached", before: { "case_id" => was },
+          after: { "case_id" => kase.id })
       end
 
-      action.update!(guard_id: guard.id) if guard
-      guard
-    end
-
-    def open_guard(kase)
-      guard = MemberGuard.open!(
-        kind: Action.guard_kind(type_key), subject_id: target_user_id,
-        channel_id: guard_channel, case_id: kase.id, by: current_account.user_id,
-        reason: params[:reason].to_s.strip, expires_at: expiry,
-        by_hand: settle_choice == MemberGuard::ALREADY_DONE
+      action = Action.create!(
+        case_id: kase.id, type_key: guard.kind, target_user_id: guard.subject_id,
+        decided_by: current_account.user_id, performed_by: current_account.user_id,
+        performed_at: Time.current, source_app: Audit::SOURCE_APP,
+        expires_at: guard.expires_at, reason: guard.reason,
+        category_key: chosen_category(kase), guard_id: guard.id,
+        details: guard.channel_id ? { "channel_id" => guard.channel_id } : {}
       )
-      audit(guard, "opened") if guard
-      guard
+      audit(action, "performed")
+      action
     end
 
-    def attached(guard, kase)
-      was = guard.case_id
-      return nil unless guard.attach_to!(kase.id)
+    def enforce(kase, action)
+      return nil unless Action.enforceable?(action.type_key)
 
-      audit(guard, "attached", before: { "case_id" => was }, after: { "case_id" => kase.id })
-      guard
-    end
+      guard = MemberGuard.open!(
+        kind: Action.guard_kind(action.type_key), subject_id: action.target_user_id,
+        channel_id: guard_channel(action.type_key), case_id: kase.id,
+        by: current_account.user_id, reason: action.reason, expires_at: action.expires_at
+      )
+      return nil if guard.nil?
 
-    def extended(guard)
-      was = guard.expires_at
-      return nil unless guard.run_until!(expiry)
-
-      audit(guard, "extended", before: { "expires_at" => was }, after: { "expires_at" => expiry })
+      audit(guard, "opened")
+      action.update!(guard_id: guard.id)
       guard
     end
 

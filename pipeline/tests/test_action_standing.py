@@ -137,11 +137,10 @@ def test_a_submit_that_never_saw_the_warning_is_sent_back():
     )
 
 
-def test_an_enforceable_kind_is_always_asked_what_nemo_should_do():
+def test_an_enforceable_kind_with_nothing_standing_is_not_asked():
     said = {"type_key": "shush", "target_user_id": WHO, "expires_on": "2026-03-10"}
     shown = {action.TARGET, action.KIND, action.UNTIL, action.REASON}
-    assert action.unasked(said, shown, standing(None))
-    assert not action.unasked(said, shown | {action.SETTLE}, standing(None))
+    assert not action.unasked(said, shown, standing(None))
 
 
 def test_a_record_only_kind_goes_straight_through():

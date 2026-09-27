@@ -650,7 +650,12 @@ module FdHelper
   end
 
   def action_options
-    ACTION_LABELS.map { |key, label| [label, key] }
+    ACTION_LABELS.map do |key, label|
+      [label, key, { data: {
+        expires: Fd::Action::NEEDS_EXPIRY.include?(key),
+        channel: Fd::Action::TAKES_CHANNEL.include?(key)
+      } }]
+    end
   end
 
   def category_label(key)
@@ -1099,7 +1104,6 @@ module FdHelper
     safe_join(["#{said} by ", member_link(first.reporter_user_id)])
   end
 
-
   ACTION_LABELS = Fd::Action::LABELS
 
   def action_label(type_key)
@@ -1422,13 +1426,28 @@ module FdHelper
     tag.span(said, class: "state #{tone}")
   end
 
+  def guard_standing_where(guard, case_id)
+    return "on no case" if guard.orphaned?
+    return "on this case" if guard.case_id == case_id
+
+    "on case #{guard.case_id}"
+  end
+
+  def guard_kind_line(guard)
+    return action_label(guard.kind) unless guard.channel_scoped?
+
+    safe_join([action_label(guard.kind), " in ", channel_link(guard.channel_id)])
+  end
+
   def guard_held_line(guard)
-    said = if guard.channel_scoped?
-      safe_join([action_label(guard.kind), " in ", channel_link(guard.channel_id)])
-    else
-      action_label(guard.kind)
-    end
+    said = guard_kind_line(guard)
     guard.orphaned? ? safe_join([said, ", on no case"]) : said
+  end
+
+  def guard_option_note(guard, case_id)
+    said = [guard_standing_where(guard, case_id)]
+    said << (guard.expires_at ? "until #{guard.expires_at.strftime("%-d %b")}" : "no end date")
+    said.join("  ·  ")
   end
 
   def guard_already(guard)
@@ -1478,28 +1497,4 @@ module FdHelper
     Fd::MemberGuard::ELSEWHERE => Fd::MemberGuard::RECORD,
     Fd::MemberGuard::HERE => Fd::MemberGuard::RECORD
   }.freeze
-
-  def settle_options(standing, type_key)
-    return [] unless standing&.enforceable?
-
-    case standing.reads
-    when Fd::MemberGuard::UNGUARDED
-      [[Fd::MemberGuard::CARRY, "Take action"],
-       [Fd::MemberGuard::ALREADY_DONE, "Already taken (records only)"]]
-    when Fd::MemberGuard::ORPHANED
-      [[Fd::MemberGuard::ADOPT, "Attach it to this case"],
-       [Fd::MemberGuard::RECORD, "Leave it where it is, just record this"]]
-    else
-      built = []
-      if Fd::Action::NEEDS_EXPIRY.include?(type_key)
-        built << [Fd::MemberGuard::EXTEND, "Change it to the date above"]
-      end
-      built << [Fd::MemberGuard::RECORD, "Just record this"]
-      built.one? ? [] : built
-    end
-  end
-
-  def settle_default(standing)
-    SETTLE_DEFAULT.fetch(standing&.reads, Fd::MemberGuard::RECORD)
-  end
 end

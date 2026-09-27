@@ -6,8 +6,9 @@ module Fd
 
     def create
       kase = Case.find(params[:case_id])
+      held = standing_guard
 
-      problem = action_objection
+      problem = held ? nil : action_objection
       if problem
         return redirect_to(fd_case_path(kase, do: "action"),
           alert: (problem unless flash[:wrong]))
@@ -16,13 +17,17 @@ module Fd
       named = false
       writing do
         named = name_a_subject(kase)
-        standing = standing_for(kase)
-        action = log_action(kase, Time.current)
-        audit(action, "performed")
-        settle_guard(kase, action, standing)
+        if held
+          attach_standing(kase, held)
+        else
+          action = log_action(kase, Time.current)
+          audit(action, "performed")
+          enforce(kase, action)
+        end
       end
 
-      redirect_to fd_case_path(kase, tab: "actions"), notice: logged_notice(kase, named)
+      redirect_to fd_case_path(kase, tab: "actions"),
+        notice: held ? attached_notice(kase, held) : logged_notice(kase, named)
     end
 
     private
@@ -36,6 +41,11 @@ module Fd
       true
     rescue ActiveRecord::RecordNotUnique
       false
+    end
+
+    def attached_notice(kase, guard)
+      said = FdHelper::ACTION_LABELS.fetch(guard.kind, guard.kind).downcase
+      "the #{said} already standing on @#{guard.subject_id} is now on case #{kase.id}"
     end
 
     def logged_notice(kase, named)

@@ -21,20 +21,16 @@ class FdActionSettleTest < ActionDispatch::IntegrationTest
     }.merge(params)
   end
 
-  def guards
-    Fd::MemberGuard.for_subject("USUB")
-  end
+  def guards = Fd::MemberGuard.for_subject("USUB")
 
-  def logged
-    @kase.actions.order(:id).last
-  end
+  def logged = @kase.actions.order(:id).last
 
   def told(verb)
     Fd::AuditEntry.where(entity_type: "member_guard", verb: verb)
   end
 
-  test "carrying it out opens a guard nemo has not done yet, linked to the action" do
-    act(settle: Fd::MemberGuard::CARRY)
+  test "a new action is always enforced, nothing is asked" do
+    act
     guard = guards.sole
     assert_equal "shush", guard.kind
     assert_equal @kase.id, guard.case_id
@@ -44,85 +40,99 @@ class FdActionSettleTest < ActionDispatch::IntegrationTest
     assert_equal 1, told("opened").count
   end
 
-  test "one already done by hand is opened as held" do
-    act(settle: Fd::MemberGuard::ALREADY_DONE)
-    guard = guards.sole
-    assert guard.by_hand?
-    assert guard.held?
-  end
-
-  test "a record only kind writes no guard at all" do
+  test "a record only kind is logged without enforcing anything" do
     act(type_key: "warning", expires_on: nil)
     assert_empty guards
     assert_nil logged.guard_id
-    assert_empty told("opened")
+    assert_equal "warning", logged.type_key
   end
 
-  test "a workspace kind is opened without the channel it was handed" do
-    act(settle: Fd::MemberGuard::CARRY, channel_id: "C0266FRGV")
+  test "a workspace kind is enforced without the channel it was handed" do
+    act(channel_id: "C0266FRGV")
     assert_nil guards.sole.channel_id
   end
 
-  test "a channel ban keeps the channel it was made in" do
-    act(type_key: "channel_ban", settle: Fd::MemberGuard::CARRY, channel_id: "C0266FRGV")
+  test "a channel ban is enforced in the channel it names" do
+    act(type_key: "channel_ban", channel_id: "C0266FRGV")
     assert_equal "C0266FRGV", guards.sole.channel_id
   end
 
-  test "adopting an orphan puts it on this case and links the action" do
-    orphan = guard!
-    act(settle: Fd::MemberGuard::ADOPT)
-    assert_equal @kase.id, orphan.reload.case_id
-    assert_equal orphan.id, logged.guard_id
-    assert_equal 1, told("attached").count
+  test "choosing one already standing attaches it and logs it, without a second guard" do
+    held = guard!
+    act(standing_guard_id: held.id)
+
+    assert_equal @kase.id, held.reload.case_id
     assert_equal 1, guards.count
+    assert_equal held.id, logged.guard_id
+    assert_equal "shush", logged.type_key
+    assert_equal 1, told("attached").count
+    assert_empty told("opened")
   end
 
-  test "an orphan left alone is neither moved nor linked" do
-    orphan = guard!
-    act(settle: Fd::MemberGuard::RECORD)
-    assert_nil orphan.reload.case_id
-    assert_nil logged.guard_id
+  test "the logged action takes its shape from the guard, not the form" do
+    held = guard!(kind: "channel_ban", channel_id: "C0266FRGV",
+      reason: "off topic", expires_at: 30.days.from_now)
+    act(standing_guard_id: held.id, type_key: "warning", reason: "something else")
+
+    assert_equal "channel_ban", logged.type_key
+    assert_equal "off topic", logged.reason
+    assert_equal "C0266FRGV", logged.details["channel_id"]
+    assert_equal held.expires_at.to_i, logged.expires_at.to_i
+  end
+
+  test "choosing one already on another case links it without moving it" do
+    other = make_case
+    held = guard!(case_id: other.id)
+    act(standing_guard_id: held.id)
+
+    assert_equal other.id, held.reload.case_id, "it is not stolen from its case"
+    assert_equal held.id, logged.guard_id
     assert_empty told("attached")
   end
 
-  test "extending moves the date on the guard that already exists" do
-    other = make_case
-    held = guard!(case_id: other.id)
-    fresh = 30.days.from_now.to_date
-    act(settle: Fd::MemberGuard::EXTEND, expires_on: fresh.to_s)
-    assert_equal fresh, held.reload.expires_at.to_date
-    assert_equal held.id, logged.guard_id
-    assert_equal 1, told("extended").count
-  end
-
-  test "a guard under another case left alone is not claimed" do
-    other = make_case
-    held = guard!(case_id: other.id)
-    act(settle: Fd::MemberGuard::RECORD)
-    assert_equal other.id, held.reload.case_id
-    assert_nil logged.guard_id
-  end
-
-  test "a guard already on this case is linked without being changed" do
+  test "choosing one already on this case logs it without attaching again" do
     held = guard!(case_id: @kase.id)
-    was = held.expires_at
-    act(settle: Fd::MemberGuard::RECORD)
+    act(standing_guard_id: held.id)
+
     assert_equal held.id, logged.guard_id
-    assert_equal was.to_i, held.reload.expires_at.to_i
     assert_empty told("attached")
-    assert_empty told("extended")
   end
 
-  test "a second shush cannot open a second guard on the same person" do
+  test "choosing one needs none of the fields the form would otherwise want" do
+    held = guard!
+    act(standing_guard_id: held.id, type_key: "", reason: "", expires_on: "")
+
+    assert_equal held.id, logged.guard_id
+    assert_equal 1, @kase.actions.count
+  end
+
+  test "a guard standing on somebody else cannot be attached" do
+    held = guard!(subject_id: "USOMEBODY")
+    act(standing_guard_id: held.id)
+
+    assert_nil held.reload.case_id
+    assert_equal "shush", logged.type_key, "it falls through to logging a new one"
+    assert_not_equal held.id, logged.guard_id
+  end
+
+  test "a lifted guard cannot be attached" do
+    held = guard!(state: "lifted", lifted_at: Time.current, lifted_by: "UMOD")
+    act(standing_guard_id: held.id)
+
+    assert_nil held.reload.case_id
+    assert_not_equal held.id, logged.guard_id
+  end
+
+  test "a second action of the same kind cannot open a second guard" do
     guard!(case_id: @kase.id)
-    act(settle: Fd::MemberGuard::CARRY)
+    act
     assert_equal 1, guards.count
   end
 
   test "nothing is written at all when the action itself is refused" do
     drop_roles!("UME")
     hold_role!("UME", "gardener")
-    act(settle: Fd::MemberGuard::CARRY)
+    act
     assert_empty guards
     assert_empty @kase.actions
   end

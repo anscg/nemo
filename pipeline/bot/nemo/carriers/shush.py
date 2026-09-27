@@ -18,6 +18,8 @@ IN_CHANNEL = (
     "Replying here will not reach anybody."
 )
 
+OVER = "Your shush has ended. You can post again."
+
 
 def take_up(client, conn, guard):
     if not memberguards.holding(conn, guard["id"]):
@@ -28,6 +30,10 @@ def take_up(client, conn, guard):
     ))
     log.info("nemo: shush %s is now held on %s", guard["id"], guard["subject_id"])
     return True
+
+
+def let_go(client, conn, guard):
+    carrying.tell_them(client, conn, guard, OVER)
 
 
 def remove(client, conn, guard, channel_id, ts):

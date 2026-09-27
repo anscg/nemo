@@ -355,28 +355,19 @@ class FdHelperTest < ActionView::TestCase
     assert_equal "look here", plain_words("<https://slack.com/x|look here>")
     assert_equal "https://slack.com/x", plain_words("<https://slack.com/x>")
   end
-  def standing(reads, enforceable: true)
-    Fd::MemberGuard::Standing.new(enforceable: enforceable, reads: reads, case_id: 1,
-      guard: Fd::MemberGuard.new(kind: "shush", subject_id: "USUB", opened_by: "UMOD"))
+  def held(**over)
+    Fd::MemberGuard.new({ kind: "shush", subject_id: "USUB", opened_by: "UMOD",
+                          reason: "being awful" }.merge(over))
   end
 
-  def values(standing, type_key)
-    settle_options(standing, type_key).map(&:first)
+  test "a guard says which case it sits on, or that it sits on none" do
+    assert_equal "on no case", guard_standing_where(held(case_id: nil), 1)
+    assert_equal "on this case", guard_standing_where(held(case_id: 1), 1)
+    assert_equal "on case 9", guard_standing_where(held(case_id: 9), 1)
   end
 
-  test "an enforceable kind that never expires is offered no extension" do
-    held = standing(Fd::MemberGuard::ELSEWHERE)
-    assert_equal %w[extend record], values(held, "shush")
-    assert_empty values(held, "warning")
-  end
-
-  test "a kind with no enforcement is asked nothing" do
-    assert_empty values(standing(Fd::MemberGuard::UNGUARDED, enforceable: false), "warning")
-    assert_empty settle_options(nil, "shush")
-  end
-
-  test "a guard on this case is offered the same two as one elsewhere" do
-    assert_equal values(standing(Fd::MemberGuard::HERE), "shush"),
-      values(standing(Fd::MemberGuard::ELSEWHERE), "shush")
+  test "a workspace guard names no channel" do
+    assert_equal "Shush, on no case", guard_held_line(held)
+    assert_equal "Shush", guard_held_line(held(case_id: 1))
   end
 end

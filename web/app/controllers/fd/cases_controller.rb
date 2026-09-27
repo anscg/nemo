@@ -27,6 +27,10 @@ module Fd
       @actions = Action.where(case_id: family).oldest_first.to_a
       @live_actions = @actions.reject(&:reversed?)
       @thread_guards = ThreadGuard.for_case(family).newest_first.to_a
+      subjects = @case.subject_user_ids
+      @action_standing = MemberGuard.standing_on(
+        @people.chosen&.user_id || (subjects.first if subjects.one?)
+      )
       @siblings = @case.sibling_cases.includes(:subjects).oldest_first.to_a
       @duplicate_candidates = Case.candidates_for(@case, @siblings)
       @notes = Note.where(case_id: family).visible.recent_first.to_a

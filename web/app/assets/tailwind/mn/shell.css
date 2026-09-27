@@ -673,6 +673,7 @@
     .work.has-nav, .work.has-nav.has-pane, .work.has-pane:not(.has-nav) {
       grid-template-columns: minmax(0, 1fr);
     }
+    .qrail { display: none; }
 
     .cpane {
       position: fixed;
