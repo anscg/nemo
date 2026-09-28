@@ -3,14 +3,18 @@ import threading
 from bot.core import audit
 
 BOT_ALLOWLIST = "bot_allowlist"
+READONLY = "readonly"
+SLOWMODE = "slowmode"
+ACCOUNT_AGE = "account_age"
+KINDS = (BOT_ALLOWLIST, READONLY, SLOWMODE, ACCOUNT_AGE)
 
 LIVE = """
-SELECT g.channel_id, g.id, coalesce(array_agg(a.subject_id) FILTER
+SELECT g.kind, g.channel_id, g.id, g.settings, coalesce(array_agg(a.subject_id) FILTER
          (WHERE a.subject_id IS NOT NULL), '{}')
 FROM fd.channel_guards g
 LEFT JOIN fd.channel_guard_allows a ON a.guard_id = g.id
-WHERE g.state = 'live' AND g.kind = %s
-GROUP BY g.channel_id, g.id
+WHERE g.state = 'live'
+GROUP BY g.kind, g.channel_id, g.id, g.settings
 """
 
 HELD = """
@@ -65,38 +69,59 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 RETURNING id
 """
 
-_allowed = {}
+_held = {}
 _loaded = False
 _lock = threading.Lock()
 
 
-def refresh(conn, kind=BOT_ALLOWLIST):
+class Held:
+    def __init__(self, guard_id, settings, allowed):
+        self.guard_id = guard_id
+        self.settings = settings or {}
+        self.allowed = allowed
+
+    def __iter__(self):
+        return iter((self.guard_id, self.allowed))
+
+    def lets_past(self, *ids):
+        return any(one and one in self.allowed for one in ids)
+
+    def seconds(self):
+        return int(self.settings.get("seconds") or 0)
+
+    def threads(self):
+        return self.settings.get("threads") is True
+
+    def min_age_days(self):
+        return int(self.settings.get("min_age_days") or 0)
+
+
+def refresh(conn):
     global _loaded
     found = {
-        row[0]: (row[1], frozenset(row[2] or ()))
-        for row in conn.execute(LIVE, (kind,)).fetchall()
+        (row[0], row[1]): Held(row[2], row[3], frozenset(row[4] or ()))
+        for row in conn.execute(LIVE).fetchall()
     }
     with _lock:
-        _allowed.clear()
-        _allowed.update(found)
+        _held.clear()
+        _held.update(found)
         _loaded = True
-    return len(found)
+    return sum(1 for kind, _ in found if kind == BOT_ALLOWLIST)
 
 
-def guarding(channel_id):
+def guarding(channel_id, kind=BOT_ALLOWLIST):
     with _lock:
         if not _loaded:
             return None
-        return _allowed.get(channel_id)
+        return _held.get((kind, channel_id))
 
 
-def lets_past(channel_id, *ids):
-    standing = guarding(channel_id)
+def lets_past(channel_id, *ids, kind=BOT_ALLOWLIST):
+    standing = guarding(channel_id, kind)
     if standing is None:
         return True
 
-    _, allowed = standing
-    return any(one and one in allowed for one in ids)
+    return standing.lets_past(*ids)
 
 
 def held(conn, channel_id, kind=BOT_ALLOWLIST):
