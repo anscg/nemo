@@ -263,6 +263,7 @@
     gap: 1px;
   }
   .cnav-group + .cnav-group { margin-top: 2px; }
+  .cnav-group.cnav-group-end { margin-top: auto; padding-top: var(--s-xs); }
 
   .cnav a {
     display: flex;

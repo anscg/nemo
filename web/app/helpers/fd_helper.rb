@@ -269,14 +269,17 @@ module FdHelper
   end
 
   def fd_nav_stops
-    here = fd_nav_here
-    stops = [
+    fd_nav_mark([
       Stop.new(key: "overview", label: "Overview", icon: "overview", path: fd_root_path),
       Stop.new(key: "cases", label: "Cases", icon: "shield", path: fd_cases_path,
         tally: Fd::Case.unresolved.not_duplicate.unassigned.count),
       Stop.new(key: "members", label: "Members", icon: "people", path: fd_members_path),
       Stop.new(key: "channels", label: "Channels", icon: "channels", path: fd_channels_path)
-    ]
+    ])
+  end
+
+  def fd_nav_tools
+    stops = []
     if current_account&.may?("app.configure")
       stops << Stop.new(key: "configuration", label: "Configuration", icon: "gear",
         path: fd_configuration_path)
@@ -284,6 +287,11 @@ module FdHelper
     if current_account&.may?("access.read")
       stops << Stop.new(key: "audit", label: "Audit log", icon: "history", path: fd_audit_path)
     end
+    fd_nav_mark(stops)
+  end
+
+  def fd_nav_mark(stops)
+    here = fd_nav_here
     stops.each { |stop| stop.here = stop.key == here }
   end
 
