@@ -99,16 +99,15 @@ class FdMemberSearchTest < ActionDispatch::IntegrationTest
     assert_includes look(@named.identity.email).map { |row| row["id"] }, @named.user_id
   end
 
-  test "a real name or email match is logged like an identity read" do
+  test "searching by real name or email is not an identity read" do
     sign_in_as(@me)
-    before = AccessLog.where(field_class: "identity_search").pluck(:id)
+    before = AccessLog.count
 
     look(@named.identity.real_name.downcase)
+    look(@named.identity.email)
 
-    fresh = AccessLog.where(field_class: "identity_search").where.not(id: before)
-    assert_operator fresh.count, :>, 0
-    assert_includes fresh.pluck(:subject_user_id), @named.user_id
-    assert fresh.pluck(:actor_id).all? { |id| id == @me.user_id }
+    assert_equal before, AccessLog.count,
+      "the roster shows no identity field, so finding somebody through one discloses nothing"
   end
 
   test "somebody whose role does not carry identity.read cannot find a person by real name" do
@@ -121,7 +120,7 @@ class FdMemberSearchTest < ActionDispatch::IntegrationTest
     assert_not_includes look(name).map { |row| row["id"] }, @named.user_id
   end
 
-  test "somebody without identity.read still finds people by handle or display name, and it is not logged as an identity read" do
+  test "somebody without identity.read still finds people by handle or display name" do
     them = hold_role!("UFF3", "firefighter")
     move_capability!("firefighter", "identity.read", false, by: "UME")
     before = AccessLog.count

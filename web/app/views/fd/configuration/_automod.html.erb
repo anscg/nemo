@@ -55,21 +55,13 @@
         <% matches.each do |match| %>
           <div class="lrow">
             <span class="grow">
-              <span class="lrow-head">
-                <b class="masked"><%= match.word %></b>
-                <%= automod_case_chip(match) %>
-              </span>
+              <b class="masked"><%= match.word %></b>
               <span class="sub"><%= match.body.presence || "no text held" %></span>
               <span class="sub">
                 <%= member_link(match.user_id) %> ·
-                <%= channel_link(match.channel_id) %> ·
+                <%= channel_link(match.channel_id, permalink: match.permalink) %> ·
                 <%= match.at.strftime("%-d %b %H:%M") %>
               </span>
-            </span>
-            <span class="lrow-right">
-              <% if match.permalink.present? %>
-                <%= open_in_slack match.permalink, css: "btn btn-sm" %>
-              <% end %>
             </span>
           </div>
         <% end %>

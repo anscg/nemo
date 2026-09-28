@@ -17,14 +17,10 @@ class FdPersonDrawerTest < ActionDispatch::IntegrationTest
     assert_match "person-drawer", response.body
   end
 
-  test "opening the drawer records the identity read against the person who opened it" do
-    assert_difference -> { AccessLog.count }, 1 do
+  test "opening the drawer is not an identity read" do
+    assert_no_difference -> { AccessLog.count } do
       get_drawer "USUB"
     end
-
-    logged = AccessLog.order(:id).last
-    assert_equal @me.user_id, logged.actor_id
-    assert_equal "USUB", logged.subject_user_id
   end
 
   test "the drawer is behind case.read like the page it opens from" do

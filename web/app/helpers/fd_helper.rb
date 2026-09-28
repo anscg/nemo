@@ -14,8 +14,13 @@ module FdHelper
     channels[channel_id]
   end
 
-  def channel_link(channel_id)
+  def channel_link(channel_id, permalink: nil)
     return tag.span(channels[channel_id], class: "sub2") if channel_id.blank?
+
+    if permalink.present?
+      return link_to(channels[channel_id], permalink, class: "handle",
+        title: "open the message in Slack", target: "_blank", rel: "noopener")
+    end
 
     link_to channels[channel_id], slack_channel_url(channel_id), class: "handle",
       title: channel_id, target: "_blank", rel: "noopener"
@@ -654,12 +659,6 @@ module FdHelper
 
   def automod_mode_chip(word)
     tag.span(AUTOMOD_MODE_LABELS.fetch(word.match_mode, word.match_mode), class: "chip")
-  end
-
-  def automod_case_chip(match)
-    return tag.span("case #{match.case_id}", class: "state state-good") if match.on_case?
-
-    tag.span("no case", class: "state state-warn")
   end
 
   def category_label(key)

@@ -67,10 +67,6 @@ module Fd
       @identity = @actor.present? && @actor.may?(RosterSql::IDENTITY_READ)
     end
 
-    def looked_up_identity?
-      asked? && identity?
-    end
-
     def [](key)
       raw = @params[key].to_s
       return raw if allowed?(key, raw)

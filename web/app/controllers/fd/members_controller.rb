@@ -5,7 +5,6 @@ module Fd
       @layout = params[:layout] == "table" ? "table" : "split"
       @query = MemberQuery.new(params, actor: current_account)
       @rows = @query.rows
-      log_identity_search
       @names = Names.for(@rows.map(&:user_id))
       @context = MemberContext.for(@rows.map(&:user_id))
       @grants = Authz::Grant.live.roles.where(user_id: @rows.map(&:user_id))
@@ -57,7 +56,6 @@ module Fd
       results = Member.search(term, actor: current_account, limit: Member::LIMIT,
         live_only: true, case_id: params[:case_id].presence&.to_i,
         bots: params[:bots].present?).to_a
-      log_identity_picker_hits(results) if identity_search?(term)
 
       faces = Names.for(results.map(&:user_id))
       found = results.map do |row|
@@ -74,7 +72,6 @@ module Fd
     def show_drawer
       @names = Names.for(@record.people_named + [@user_id])
       @member = @names.member(@user_id)
-      @identity = MemberIdentity.look_up(@user_id, actor: current_account)
       @context = MemberContext.for([@user_id])[@user_id]
       @rooms = SlackScan.channels(@user_id)
       @standing = MemberStanding.new(@record)
@@ -100,26 +97,6 @@ module Fd
       @pane_context = MemberContext.for(user_ids)
       @pane_grants = Authz::Grant.live.roles.where(user_id: user_ids).index_by(&:user_id)
       @pane_views = @pane_query.views
-    end
-
-    def log_identity_search
-      return unless @query.looked_up_identity?
-
-      @rows.each do |row|
-        AccessLog.record!(actor: current_account, subject_user_id: row.user_id,
-          field_class: "identity_search")
-      end
-    end
-
-    def identity_search?(term)
-      term.to_s.strip.present? && current_account.may?("identity.read")
-    end
-
-    def log_identity_picker_hits(results)
-      results.each do |member|
-        AccessLog.record!(actor: current_account, subject_user_id: member.user_id,
-          field_class: "identity_search")
-      end
     end
   end
 end

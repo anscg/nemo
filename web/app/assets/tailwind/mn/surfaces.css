@@ -422,6 +422,7 @@
   .lrow, .srow, .record-row, .source-row { align-items: flex-start; }
   .list > .lrow { padding: 9px 0; border-top: 1px solid var(--line-soft); }
   .list > .lrow:first-child { border-top: 0; }
+  .card-flush > .list > .lrow { padding-inline: var(--s-xs); }
   .lrow > .grow, .row > .grow, .srow > .grow, .record-row > .grow {
     display: flex;
     flex-direction: column;

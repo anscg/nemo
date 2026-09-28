@@ -145,7 +145,29 @@ class FdConfigurationTest < ActionDispatch::IntegrationTest
     get fd_configuration_path
 
     assert_match(/the message that matched/, response.body)
-    assert_match(/no case/, response.body)
+    assert_match(/USUB/, response.body)
+  end
+
+  test "the channel on a match opens the message it matched" do
+    word = word!
+    Fd::AutomodMatch.create!(word_id: word.id, word: word.word, effect: "flag",
+      user_id: "USUB", channel_id: "C0266FRGV", message_ts: "1700000000.000100",
+      body: "the message that matched",
+      permalink: "https://hackclub.slack.com/archives/C0266FRGV/p1700000000000100")
+    get fd_configuration_path
+
+    assert_select %(a.handle[href=?]),
+      "https://hackclub.slack.com/archives/C0266FRGV/p1700000000000100"
+  end
+
+  test "a match with no permalink still links to the channel" do
+    word = word!
+    Fd::AutomodMatch.create!(word_id: word.id, word: word.word, effect: "flag",
+      user_id: "USUB", channel_id: "C0266FRGV", message_ts: "1700000000.000100",
+      body: "the message that matched")
+    get fd_configuration_path
+
+    assert_select %(a.handle[href*=?]), "C0266FRGV"
   end
 
   test "somebody without the capability cannot put a word on the list" do
