@@ -262,7 +262,8 @@ module FdHelper
 
   NAV_HOME = { "fd/fire" => "overview", "fd/members" => "members",
                "fd/channels" => "channels", "fd/audits" => "audit",
-               "fd/configuration" => "configuration" }.freeze
+               "fd/configuration" => "configuration",
+               "fd/channel_purges" => "channels" }.freeze
 
   def fd_nav_here
     NAV_HOME.fetch(controller_path, "cases")

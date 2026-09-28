@@ -3,6 +3,7 @@
     <h2 class="card-title">Slow mode</h2>
     <div class="card-tools">
       <% if guard %>
+        <%= submit_tag "Save", class: "btn btn-sm btn-primary", form: "slowmode-form" %>
         <%= opens_modal "channel.guard", "Exempt somebody", opens: "allow-bot",
               css: "btn btn-sm" %>
       <% end %>
@@ -11,22 +12,24 @@
   </div>
 
   <% if guard %>
-    <div class="card-body">
-      <%= form_with url: fd_channel_guard_path(channel_id, guard.kind), method: :patch do %>
-        <div class="ivrow">
-          <label class="field-label">
-            Seconds
+    <%= form_with url: fd_channel_guard_path(channel_id, guard.kind), method: :patch,
+          id: "slowmode-form" do %>
+      <div class="setlist">
+        <label class="setline">
+          <span class="setname">Seconds between messages</span>
+          <span class="setval">
             <%= number_field_tag :seconds, guard.seconds, class: "input", id: nil,
                   min: 1, max: Fd::ChannelGuard::SLOWEST %>
-          </label>
-          <label class="opt">
-            <%= check_box_tag :threads, "1", guard.threads?, class: "tick", id: nil %>
-            <span class="opt-body"><span class="opt-label">Threads too</span></span>
-          </label>
-          <%= submit_tag "Save", class: "btn btn-primary" %>
-        </div>
-      <% end %>
-    </div>
+          </span>
+        </label>
+        <label class="setline">
+          <span class="setname">Also in threads</span>
+          <span class="setval">
+            <%= check_box_tag :threads, "1", guard.threads?, class: "switch", id: nil %>
+          </span>
+        </label>
+      </div>
+    <% end %>
     <%= render "allows", channel_id: channel_id, guard: guard, allows: allows,
           empty: "Nobody is exempt" %>
   <% else %>

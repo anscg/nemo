@@ -11,12 +11,13 @@
     </div>
 
     <% if purges.any? %>
-      <div class="list">
+      <div class="list purge-list">
         <% purges.each do |purge| %>
           <div class="lrow">
             <span class="grow">
               <span class="lrow-head">
-                <b><%= purge.wanted %> asked</b>
+                <b><%= link_to "#{purge.wanted} asked",
+                      fd_channel_purge_path(channel_id, purge), class: "lnk" %></b>
                 <%= purge_state_chip(purge) %>
               </span>
               <span class="sub"><%= purge.reason %></span>
@@ -24,7 +25,7 @@
                 <%= member_link(purge.asked_by) %> ·
                 <%= at_minute(purge.asked_at) %>
                 <% unless purge.waiting? %>
-                  · <%= pluralize(purge.taken_down, "taken down") %>
+                  · <%= purge.taken_down %> taken down
                   <% if purge.replies_taken.positive? %>
                     · <%= purge.replies_taken %> in threads
                   <% end %>

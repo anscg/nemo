@@ -81,19 +81,23 @@ module Fd
     end
 
     def seconds
-      params[:seconds].to_s.strip.to_i
+      said = params[:seconds].to_s.strip
+      said.present? ? said.to_i : ChannelGuard::SECONDS_TO_START
     end
 
     def min_age_days
-      params[:min_age_days].to_s.strip.to_i
+      said = params[:min_age_days].to_s.strip
+      said.present? ? said.to_i : ChannelGuard::DAYS_TO_START
     end
 
     def settings_objection
       case kind
       when ChannelGuard::SLOWMODE
+        return nil if params[:seconds].to_s.strip.blank?
         return "say how many seconds, from 1 to #{ChannelGuard::SLOWEST}" unless
           seconds.between?(1, ChannelGuard::SLOWEST)
       when ChannelGuard::ACCOUNT_AGE
+        return nil if params[:min_age_days].to_s.strip.blank?
         return "say how many days, from 1 to #{ChannelGuard::OLDEST}" unless
           min_age_days.between?(1, ChannelGuard::OLDEST)
       end

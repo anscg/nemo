@@ -123,4 +123,100 @@ class FdChannelPurgeTest < ActionDispatch::IntegrationTest
     assert_select %(span.btn-off[aria-disabled="true"])
     assert_no_match(/modal-open="purge-channel"/, response.body)
   end
+
+  def done_with(kept, **over)
+    ask
+    one = purges.sole
+    one.update!({ state: "done", finished_at: Time.current, taken_down: kept.size,
+                  transcript: kept }.merge(over))
+    one
+  end
+
+  test "a purge opens its own page" do
+    one = done_with([{ "ts" => "1700000000.000100", "thread_ts" => nil,
+                       "user" => "USUB", "text" => "the raid" }])
+    get fd_channel_purge_path(@id, one)
+
+    assert_response :success
+    assert_match(/the raid/, response.body)
+    assert_match(/Purged/, response.body)
+    assert_no_match(/taken downs/, response.body)
+  end
+
+  test "the page counts as the channels section" do
+    one = done_with([])
+    get fd_channel_purge_path(@id, one)
+
+    assert_select %(a[aria-current="page"]), text: /Channels/
+  end
+
+  test "the row links to it" do
+    one = done_with([])
+    get fd_channel_path(@id, tab: "purge")
+
+    assert_match(%r{href="#{fd_channel_purge_path(@id, one)}"}, response.body)
+  end
+
+  test "replies sit under the message they answered" do
+    one = done_with([
+      { "ts" => "1700000000.000200", "thread_ts" => "1700000000.000100",
+        "user" => "UOTH", "text" => "the reply" },
+      { "ts" => "1700000000.000100", "thread_ts" => nil,
+        "user" => "USUB", "text" => "the top" }
+    ])
+    get fd_channel_purge_path(@id, one)
+    said = response.body
+
+    assert_operator said.index("the top"), :<, said.index("the reply")
+    assert_select %(details.purge-thread > summary), text: /1 reply/
+  end
+
+  test "a reply whose parent was not taken is still shown" do
+    one = done_with([
+      { "ts" => "1700000000.000200", "thread_ts" => "1700000000.000999",
+        "user" => "UOTH", "text" => "an orphan" }
+    ])
+    get fd_channel_purge_path(@id, one)
+
+    assert_match(/an orphan/, response.body)
+  end
+
+  test "a message with no text still shows who said it" do
+    one = done_with([{ "ts" => "1700000000.000100", "thread_ts" => nil,
+                       "user" => "USUB", "text" => nil }])
+    get fd_channel_purge_path(@id, one)
+
+    assert_match(/no text held/, response.body)
+  end
+
+  test "a firefighter may read one" do
+    one = done_with([{ "ts" => "1700000000.000100", "thread_ts" => nil,
+                       "user" => "USUB", "text" => "the raid" }])
+    drop_roles!("UME")
+    hold_role!("UME", "firefighter")
+    get fd_channel_purge_path(@id, one)
+
+    assert_response :success
+    assert_match(/the raid/, response.body)
+  end
+
+  test "somebody without channel.guard may not" do
+    one = done_with([])
+    drop_roles!("UME")
+    hold_role!("UME", "gardener")
+    get fd_channel_purge_path(@id, one)
+
+    assert_response :redirect
+  end
+
+  test "a purge from another channel is not found here" do
+    one = done_with([])
+    other = Analytics::DimChannel.where(archived: false).order(:channel_id).second
+    skip "the corpus has one channel" if other.nil?
+
+    get fd_channel_purge_path(other.channel_id, one)
+
+    assert_response :not_found
+  end
 end
+

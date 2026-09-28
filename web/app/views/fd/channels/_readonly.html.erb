@@ -3,7 +3,7 @@
     <h2 class="card-title">Read-only</h2>
     <div class="card-tools">
       <% if guard %>
-        <%= opens_modal "channel.guard", "Let somebody post", opens: "allow-bot",
+        <%= opens_modal "channel.guard", "Allow", opens: "allow-bot",
               css: "btn btn-sm" %>
       <% end %>
       <%= channel_guard_switch(channel_id, guard, kind: Fd::ChannelGuard::READONLY) %>

@@ -33,6 +33,40 @@ module Fd
       kept.count { |one| one["thread_ts"].present? }
     end
 
+    Said = Struct.new(:ts, :thread_ts, :user, :text, keyword_init: true) do
+      def at
+        Time.zone.at(ts.to_f) if ts.to_s.include?(".")
+      end
+    end
+
+    class Reading
+      def initialize(kept)
+        @said = kept.map { |one| Said.new(**one.symbolize_keys.slice(*Said.members)) }
+      end
+
+      def tops
+        @tops ||= @said.reject { |one| one.thread_ts.present? }.sort_by { |one| one.ts.to_f }
+      end
+
+      def below(parent)
+        replies.fetch(parent.ts, [])
+      end
+
+      def orphans
+        @orphans ||= replies.reject { |ts, _| tops.any? { |one| one.ts == ts } }.values.flatten
+      end
+
+      def any? = @said.any?
+
+      private
+
+      def replies
+        @replies ||= @said.select { |one| one.thread_ts.present? }
+          .group_by(&:thread_ts)
+          .transform_values { |held| held.sort_by { |one| one.ts.to_f } }
+      end
+    end
+
     def people_named
       [asked_by] + kept.filter_map { |one| one["user"] }
     end

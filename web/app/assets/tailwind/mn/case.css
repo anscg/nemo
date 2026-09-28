@@ -562,6 +562,29 @@
   }
   .msg-gone, .thr-gone { color: var(--ink-4); font-style: normal; }
 
+  .purge-thread {
+    margin: 0 0 var(--s-2xs) 40px;
+    padding-left: var(--s-xs);
+    border-left: 2px solid var(--line-soft);
+  }
+  .purge-thread > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 2px 0 4px;
+    font-size: var(--t-small);
+    color: var(--ink-3);
+  }
+  .purge-thread > summary::-webkit-details-marker { display: none; }
+  .purge-thread > summary:hover { color: var(--ink); }
+  .purge-thread > summary::before {
+    content: "\25b8";
+    display: inline-block;
+    width: 14px;
+    color: var(--ink-4);
+  }
+  .purge-thread[open] > summary::before { content: "\25be"; }
+  .purge-list > .lrow { padding-left: var(--s-sm); padding-right: var(--s-sm); }
+
   .msg-cites { display: flex; flex-direction: column; gap: var(--s-2xs); margin-top: 6px; }
   .cite {
     margin: 0;

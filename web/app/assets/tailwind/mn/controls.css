@@ -337,7 +337,7 @@
   }
   .textarea { height: auto; min-height: 76px; padding: 8px 10px; resize: vertical; line-height: 1.55; }
 
-  input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+  input[type="number"] { appearance: textfield; -moz-appearance: textfield; max-width: 110px; }
   input[type="number"]::-webkit-outer-spin-button,
   input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
@@ -411,6 +411,34 @@
   .field:has(+ .field-wrong), .input:has(+ .field-wrong) { border-color: var(--crit); }
 
   .cfield { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+  .tickline {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2xs);
+    font-size: var(--t-body);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .setlist { display: flex; flex-direction: column; }
+  .setlist > .setline {
+    display: flex;
+    align-items: center;
+    gap: var(--s-xs);
+    min-height: 44px;
+    padding: 6px var(--s-sm);
+    border-top: 1px solid var(--line-soft);
+  }
+  .setlist > .setline:first-child { border-top: 0; }
+  .setline > .setname {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--t-body);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .setline > .setval { flex: none; margin-left: auto; display: flex; align-items: center; }
   .tick:hover, .facet-tick:hover { border-color: var(--ink-4); }
   .tick:checked, .facet-tick:checked { background: var(--accent); border-color: var(--accent); }
   .tick:checked::after, .facet-tick:checked::after {

@@ -7,9 +7,9 @@
       <%= form_with url: fd_configuration_autoresponse_path, method: :post,
             html: { autocomplete: "off" } do %>
         <div class="stack">
-          <label class="opt">
-            <%= check_box_tag :on, "1", @autoresponse_on, class: "tick", id: nil %>
-            <span class="opt-body"><span class="opt-label">On</span></span>
+          <label class="tickline">
+            <%= check_box_tag :on, "1", @autoresponse_on, class: "switch", id: nil %>
+            <span>On</span>
           </label>
           <label class="field-label">
             Emoji
@@ -33,9 +33,7 @@
             <%= text_area_tag :body, @autoresponse_body, rows: 10, class: "textarea", id: nil,
                   maxlength: Fd::ResponsesController::LONGEST %>
           </label>
-          <div class="ivrow">
-            <%= submit_tag "Save", class: "btn btn-primary" %>
-          </div>
+          <div><%= submit_tag "Save", class: "btn btn-primary" %></div>
         </div>
       <% end %>
     </div>
@@ -49,18 +47,16 @@
       <%= form_with url: fd_configuration_unsub_shield_path, method: :post,
             html: { autocomplete: "off" } do %>
         <div class="stack">
-          <label class="opt">
-            <%= check_box_tag :on, "1", @unsub_on, class: "tick", id: nil %>
-            <span class="opt-body"><span class="opt-label">On</span></span>
+          <label class="tickline">
+            <%= check_box_tag :on, "1", @unsub_on, class: "switch", id: nil %>
+            <span>On</span>
           </label>
           <label class="field-label">
             Link
             <%= text_field_tag :link, @unsub_link, class: "input", id: nil,
                   placeholder: "https://unsub.hack.club" %>
           </label>
-          <div class="ivrow">
-            <%= submit_tag "Save", class: "btn btn-primary" %>
-          </div>
+          <div><%= submit_tag "Save", class: "btn btn-primary" %></div>
         </div>
       <% end %>
     </div>

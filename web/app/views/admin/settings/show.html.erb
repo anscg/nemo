@@ -15,29 +15,31 @@
   <div class="card card-flush">
     <div class="card-head">
       <h2 class="card-title">Guard expiry</h2>
-    </div>
-    <div class="card-body">
-      <%= form_with url: admin_settings_sweep_path, method: :post do %>
-        <div class="stack">
-          <label class="field-label">
-            Firehouse warning, hours ahead
-            <%= number_field_tag :soon_hours, @soon_hours, class: "input", id: nil,
-                  min: 1, max: Admin::SettingsController::SOONEST,
-                  disabled: !may_grant? %>
-          </label>
-          <label class="opt">
-            <%= check_box_tag :tells, "1", @tells_member, class: "tick", id: nil,
-                  disabled: !may_grant? %>
-            <span class="opt-body">
-              <span class="opt-label">DM the member when their guard lifts</span>
-            </span>
-          </label>
-          <% if may_grant? %>
-            <div class="ivrow"><%= submit_tag "Save", class: "btn btn-primary" %></div>
-          <% end %>
+      <% if may_grant? %>
+        <div class="card-tools">
+          <%= submit_tag "Save", class: "btn btn-sm btn-primary", form: "sweep-form" %>
         </div>
       <% end %>
     </div>
+    <%= form_with url: admin_settings_sweep_path, method: :post, id: "sweep-form" do %>
+      <div class="setlist">
+        <label class="setline">
+          <span class="setname">Firehouse warning, hours ahead</span>
+          <span class="setval">
+            <%= number_field_tag :soon_hours, @soon_hours, class: "input", id: nil,
+                  min: 1, max: Admin::SettingsController::SOONEST,
+                  disabled: !may_grant? %>
+          </span>
+        </label>
+        <label class="setline">
+          <span class="setname">DM the member when their guard lifts</span>
+          <span class="setval">
+            <%= check_box_tag :tells, "1", @tells_member, class: "switch", id: nil,
+                  disabled: !may_grant? %>
+          </span>
+        </label>
+      </div>
+    <% end %>
   </div>
 
   <div class="card card-flush">

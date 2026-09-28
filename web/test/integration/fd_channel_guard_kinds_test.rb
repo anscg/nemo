@@ -77,6 +77,20 @@ class FdChannelGuardKindsTest < ActionDispatch::IntegrationTest
     assert_not live("slowmode").threads?
   end
 
+  test "the switch turns slow mode on with an interval to start from" do
+    turn_on("slowmode")
+
+    assert_equal Fd::ChannelGuard::SECONDS_TO_START, live("slowmode").seconds
+    assert_nil flash[:alert]
+  end
+
+  test "the switch turns the age gate on with days to start from" do
+    turn_on("account_age")
+
+    assert_equal Fd::ChannelGuard::DAYS_TO_START, live("account_age").min_age_days
+    assert_nil flash[:alert]
+  end
+
   test "slow mode refuses a interval outside the range" do
     turn_on("slowmode", seconds: "0")
     assert_nil live("slowmode")

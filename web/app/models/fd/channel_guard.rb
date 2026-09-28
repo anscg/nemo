@@ -13,6 +13,9 @@ module Fd
     SLOWEST = 3600
     OLDEST = 365
 
+    SECONDS_TO_START = 30
+    DAYS_TO_START = 7
+
     has_many :allows, class_name: "Fd::ChannelGuardAllow", foreign_key: :guard_id,
       inverse_of: :guard, dependent: :destroy
     has_many :events, class_name: "Fd::ChannelGuardEvent", foreign_key: :guard_id,

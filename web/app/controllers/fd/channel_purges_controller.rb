@@ -1,8 +1,16 @@
 module Fd
   class ChannelPurgesController < BaseController
-    permit "channel.purge"
+    permit "channel.purge", only: :create
+    permit "channel.guard", only: :show
 
     LONGEST_REASON = 500
+
+    def show
+      @purge = ChannelPurge.for_channel(channel_id).find(params[:id])
+      @channel = Analytics::DimChannel.find_by(channel_id: channel_id)
+      @threads = ChannelPurge::Reading.new(@purge.kept)
+      @names = Names.for(@purge.people_named)
+    end
 
     def create
       problem = objection
