@@ -24,6 +24,7 @@ module Fd
       "Fd::ChannelGuard" => "channel_guard",
       "Fd::MemberGuard" => "member_guard",
       "Fd::ThreadGuard" => "thread_guard",
+      "Fd::AutomodWord" => "automod_word",
       "Fd::ChannelGuardAllow" => "channel_allow",
       "Fd::AppSetting" => "app_setting",
       "Authz::Grant" => "capability_grant",

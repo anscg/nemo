@@ -261,7 +261,8 @@ module FdHelper
   Stop = Struct.new(:key, :label, :icon, :path, :here, :tally, keyword_init: true)
 
   NAV_HOME = { "fd/fire" => "overview", "fd/members" => "members",
-               "fd/channels" => "channels", "fd/audits" => "audit" }.freeze
+               "fd/channels" => "channels", "fd/audits" => "audit",
+               "fd/configuration" => "configuration" }.freeze
 
   def fd_nav_here
     NAV_HOME.fetch(controller_path, "cases")
@@ -276,6 +277,10 @@ module FdHelper
       Stop.new(key: "members", label: "Members", icon: "people", path: fd_members_path),
       Stop.new(key: "channels", label: "Channels", icon: "channels", path: fd_channels_path)
     ]
+    if current_account&.may?("app.configure")
+      stops << Stop.new(key: "configuration", label: "Configuration", icon: "gear",
+        path: fd_configuration_path)
+    end
     if current_account&.may?("access.read")
       stops << Stop.new(key: "audit", label: "Audit log", icon: "history", path: fd_audit_path)
     end
@@ -657,6 +662,32 @@ module FdHelper
         lock: Fd::Action.from_thread_lock?(key)
       } }]
     end
+  end
+
+  CONFIGURATION_TAB_LABELS = { "automod" => "Automod" }.freeze
+
+  def configuration_tab_label(key)
+    CONFIGURATION_TAB_LABELS.fetch(key) { key.tr("_", " ").capitalize }
+  end
+
+  AUTOMOD_MODE_LABELS = {
+    "word" => "Whole word",
+    "substring" => "Substring",
+    "regex" => "Regex"
+  }.freeze
+
+  def automod_mode_options
+    Fd::AutomodWord::MATCHES.map { |key| [AUTOMOD_MODE_LABELS.fetch(key), key] }
+  end
+
+  def automod_mode_chip(word)
+    tag.span(AUTOMOD_MODE_LABELS.fetch(word.match_mode, word.match_mode), class: "chip")
+  end
+
+  def automod_case_chip(match)
+    return tag.span("case #{match.case_id}", class: "state state-good") if match.on_case?
+
+    tag.span("no case", class: "state state-warn")
   end
 
   def category_label(key)

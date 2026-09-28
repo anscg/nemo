@@ -29,6 +29,8 @@ Rails.application.routes.draw do
     post "channels/:channel_id/allows", to: "channel_allows#create", as: :channel_allows
     delete "channels/:channel_id/allows/:id", to: "channel_allows#destroy", as: :channel_allow
     resources :channels, only: [:index, :show], param: :channel_id
+    resource :configuration, only: [:show], controller: "configuration"
+    resources :automod_words, only: [:create, :destroy], path: "configuration/automod"
     resources :members, only: [:index, :show] do
       resources :notes, only: [:create, :destroy], controller: "member_notes"
       resources :guards, only: [:create, :update, :destroy], controller: "member_guards"

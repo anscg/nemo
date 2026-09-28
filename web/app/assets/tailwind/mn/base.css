@@ -94,6 +94,14 @@
   }
   .sub2 { font-size: var(--t-fine); color: var(--ink-4); }
 
+  .masked {
+    filter: blur(5px);
+    transition: filter var(--dur-2) var(--ease);
+    cursor: default;
+  }
+  .masked:hover, .masked:focus-visible, tr:focus-within .masked { filter: none; }
+  @media (prefers-reduced-motion: reduce) { .masked { transition: none; } }
+
   .two-line {
     display: flex;
     flex-direction: column;
