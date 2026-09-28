@@ -14,8 +14,6 @@
       <input class="input input-sm grow" id="pane-case-filter" type="search"
              autocomplete="off" placeholder="Filter by number, handle, or words"
              data-pane-filter-target="query" data-action="input->pane-filter#filter">
-      <%= link_to "Table", fd_cases_path(query.to_params.merge(layout: "table")),
-            class: "btn btn-ghost btn-sm", title: "Open the full case table" %>
     </div>
     <% if query.view.nil? %>
       <div class="pane-filt">

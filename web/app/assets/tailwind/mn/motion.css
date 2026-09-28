@@ -72,7 +72,7 @@
     z-index: 4;
   }
 
-  .qrow, .rep-card, .member-qrow, .merge-qrow, .palette-row, .pick-opt, .picker-opt {
+  .qrow, .member-qrow, .merge-qrow, .palette-row, .pick-opt, .picker-opt {
     transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   }
 

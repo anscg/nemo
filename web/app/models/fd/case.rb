@@ -91,26 +91,6 @@ module Fd
         .distinct.count(:case_id)
     end
 
-    def self.thread_message_counts_for(case_ids)
-      ids = case_ids.compact.uniq
-      return {} if ids.empty?
-
-      CaseThread.where(case_id: ids)
-        .joins(<<~SQL.squish)
-          JOIN fd.thread_messages tm
-            ON tm.channel_id = fd.case_threads.channel_id
-           AND tm.thread_ts = fd.case_threads.thread_ts
-        SQL
-        .group(:case_id).count
-    end
-
-    def self.flagged_counts_for(case_ids)
-      ids = case_ids.compact.uniq
-      return {} if ids.empty?
-
-      CaseCitation.where(case_id: ids).group(:case_id).count
-    end
-
     ACTED = "action_taken".freeze
 
     def self.ending_tally
@@ -132,28 +112,6 @@ module Fd
       end
 
       acted + rows
-    end
-
-    def self.action_counts_for(case_ids)
-      ids = case_ids.compact.uniq
-      return {} if ids.empty?
-
-      Action.where(case_id: ids).group(:case_id).count
-    end
-
-    def self.live_action_counts_for(case_ids)
-      ids = case_ids.compact.uniq
-      return {} if ids.empty?
-
-      Action.where(case_id: ids, reversed_at: nil).group(:case_id).count
-    end
-
-    def self.thread_channels_for(case_ids)
-      ids = case_ids.compact.uniq
-      return {} if ids.empty?
-
-      CaseThread.where(case_id: ids).pluck(:case_id, :channel_id)
-        .group_by(&:first).transform_values { |pairs| pairs.map(&:last).uniq }
     end
 
     AROUND = "around".freeze

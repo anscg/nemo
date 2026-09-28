@@ -156,19 +156,6 @@ module FdHelper
     end
   end
 
-  def case_sort_header(label, key, numeric: false)
-    css = ["th-sort"]
-    css << "num" if numeric
-    css << (@query.descending? ? "sort-down" : "sort-up") if @query.sorting?(key)
-
-    tag.th(class: css.join(" "), aria: { sort: sort_state(key) }) do
-      link_to fd_cases_path(@query.sort_params(key)), data: { turbo_frame: "queue" } do
-        concat tag.span(label)
-        concat sort_caret(key)
-      end
-    end
-  end
-
   def sort_state(key)
     return nil unless @query.sorting?(key)
 
@@ -709,10 +696,6 @@ module FdHelper
     Fd::Case::CATEGORIES.map { |key| [category_label(key), key] }
   end
 
-  def facet_link(query, key, value)
-    fd_cases_path(query.facet_params(key => value))
-  end
-
   def note_byline(note)
     safe_join([member_link(note.author), on_day(note.created_at)], " · ")
   end
@@ -838,36 +821,8 @@ module FdHelper
     tag.span(said, data: { cachet_name: user_id })
   end
 
-  def row_avatar(kase)
-    id = kase.subject_user_ids.first if kase.subject_user_ids.one?
-    face(id)
-  end
-
-  def assignee_faces(user_ids)
-    return "nobody" if user_ids.blank?
-
-    safe_join(Array(user_ids).map { |id|
-      tag.span(class: "face-name") { safe_join([slack_face(id), handle(id)]) }
-    }, " ")
-  end
-
-  def row_subject_avatar(kase)
-    face(kase.subject_user_ids.first)
-  end
-
   def case_first_report(kase)
     kase.reports.min_by(&:received_at)
-  end
-
-  def case_excerpt(kase)
-    case_first_report(kase)&.body.presence
-  end
-
-  def case_gist(kase)
-    body = case_first_report(kase)&.body.presence
-    return nil if body.nil?
-
-    tag.span(class: "gist") { tag.q(body) }
   end
 
   def cited_words
@@ -911,35 +866,6 @@ module FdHelper
     return pluralize(held, "attachment") if held.positive?
 
     "a report with nothing in it"
-  end
-
-  def case_needs(kase)
-    return [] if kase.resolved?
-
-    return [] if kase.subject_user_ids.any?
-
-    ["a subject"]
-  end
-
-  def case_reports_shown(kase)
-    kase.reports.sort_by(&:received_at)
-  end
-
-  def report_reply_state(report)
-    return [:told, report.closed_line(names)] if report.told_of_outcome?
-    return [:replied, "replied #{on_day(report.first_replied_at)}"] if report.replied?
-
-    [:waiting, "no reply to the reporter yet, #{case_age_label(report.waiting_for)}"]
-  end
-
-  def case_opened_by_line(kase)
-    safe_join(["opened by ", member_link(kase.opened_by), " on #{on_day(kase.opened_at)}"])
-  end
-
-  def to_sentence_words(words)
-    return words.first if words.one?
-
-    "#{words[0..-2].join(', ')} and #{words.last}"
   end
 
   def row_reporter(kase)
@@ -1020,14 +946,6 @@ module FdHelper
     return "#{kase.subject_user_ids.size} subjects" if lone.nil?
 
     prior_phrase(prior_counts.fetch(lone, 0))
-  end
-
-  def row_subject_label(kase)
-    ids = kase.subject_user_ids
-    return "nobody identified yet" if ids.empty?
-    return names[ids.first] if ids.one?
-
-    "#{names[ids.first]} and #{pluralize(ids.size - 1, 'other')}"
   end
 
   def row_reporter_label(kase)

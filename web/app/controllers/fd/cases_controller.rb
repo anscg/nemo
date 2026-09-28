@@ -7,11 +7,10 @@ module Fd
     permit "case.categorise", on: -> { Case.find(params[:id]) }, only: :update
 
     TABS = %w[report people evidence actions notes timeline].freeze
-    PER_PAGE = 50
 
     def index
       @open_modal = params[:open] == "1"
-      load_queue
+      load_index
     end
 
     def show
@@ -262,7 +261,7 @@ module Fd
       flash.now[:alert] = message
       @open_modal = true
       load_pane
-      load_queue
+      load_index
       render :index, status: :unprocessable_content
     end
 
@@ -290,38 +289,11 @@ module Fd
       @pane_channels = @cited_words.values.map(&:channel)
     end
 
-    def load_queue
-      @query = CaseQuery.new(params, viewer: current_account&.user_id)
-      @page = [params[:page].to_i, 1].max
-      found = @query.relation.includes(:subjects, :assignees, :reports)
-        .offset((@page - 1) * PER_PAGE).limit(PER_PAGE + 1).to_a
-      @more = found.size > PER_PAGE
-      @cases = found.first(PER_PAGE)
-      @cited_words = @cited_words.merge(IntakeShare.first_words_for(@cases.map(&:id)))
-      @held_counts = @held_counts.merge(IntakeFile.counts_for_cases(@cases.map(&:id)))
-      @total = @query.relation.count
-      @pages = [(@total / PER_PAGE.to_f).ceil, 1].max
-      case_ids = @cases.map(&:id)
-      @thread_counts = Case.thread_message_counts_for(case_ids)
-      @thread_channels = Case.thread_channels_for(case_ids)
-      @priors = Case.prior_counts_for(@cases.flat_map(&:subject_user_ids))
-      @violations = Case.violations_for(case_ids)
-      @flagged_counts = Case.flagged_counts_for(case_ids)
-      @live_action_counts = Case.live_action_counts_for(case_ids)
-      @action_counts = Case.action_counts_for(case_ids)
-      @channels = ChannelNames.for(@thread_channels.values.flatten +
-        @cited_words.values.map(&:channel))
-      @stats = QueueStats.load
-      @total_count = @stats.total
-      @layout = %w[board table].include?(params[:layout]) ? params[:layout] : "queue"
-      @views = @query.views
+    def load_index
+      @names = Names.for(Array(@pane_people))
+      @channels = ChannelNames.for(Array(@pane_channels))
       @subject_preset = preset_for(asked_subjects)
-      @names = Names.for(@cases.flat_map { |kase|
-        kase.subject_user_ids + kase.assignee_user_ids + [kase.opened_by] +
-          kase.reports.map(&:reporter_user_id) + kase.reports.map(&:closed_by)
-      } + @cited_words.values.map(&:author))
       @open_for_subject ||= []
-      @flags = CaseFlags.for_queue
     end
   end
 end

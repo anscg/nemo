@@ -99,17 +99,6 @@ class FdHelperTest < ActionView::TestCase
     assert_no_match(/n\/a/, line)
   end
 
-  test "several subjects are named on the row, not counted in the subtitle" do
-    saved = make_case(subject: "UAAA")
-    saved.add_subject!("UBBB")
-    assert_match(/@UAAA and 1 other/, row_subject_label(Fd::Case.find(saved.id)))
-  end
-
-  test "no subject yet says so plainly, not as a bare n/a" do
-    saved = make_case(subject: nil)
-    assert_equal "nobody identified yet", row_subject_label(Fd::Case.find(saved.id))
-  end
-
   test "the subtitle says who raised it, reporter or opener" do
     reported = make_case(subject: "UAAA")
     Fd::CaseReport.create!(case_id: reported.id, is_anonymous: true,
@@ -164,26 +153,6 @@ class FdHelperTest < ActionView::TestCase
     saved = make_case(subject: "UAAA")
     Fd::CaseReport.create!(case_id: saved.id, reporter_user_id: "UREP1", is_anonymous: false,
       source_app: "shroud", received_at: 3.days.ago, **attrs)
-  end
-
-  test "an unanswered report says how long the reporter has been waiting" do
-    state, line = report_reply_state(report)
-    assert_equal :waiting, state
-    assert_equal "no reply to the reporter yet, 3d", line
-  end
-
-  test "an answered report gives the date, not the wait" do
-    state, line = report_reply_state(report(first_replied_at: Time.utc(2026, 3, 4, 12)))
-    assert_equal :replied, state
-    assert_equal "replied 4 Mar 2026", line
-  end
-
-  test "a closed report names who told the reporter the outcome" do
-    said = report(first_replied_at: 2.days.ago, closed_at: Time.utc(2026, 3, 5, 12),
-      closed_by: "USTAFF")
-    state, line = report_reply_state(said)
-    assert_equal :told, state
-    assert_equal "told the outcome 5 Mar by @USTAFF", line
   end
 
   def intake(conversation_id, author:)

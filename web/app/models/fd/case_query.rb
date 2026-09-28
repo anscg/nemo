@@ -36,7 +36,6 @@ module Fd
     }.freeze
 
     TABS = %w[attention unassigned mine acted resolved everything].freeze
-    PINNED_PILLS = [].freeze
 
     VIEW_FACETS = {
       "attention" => { "status" => "open" },

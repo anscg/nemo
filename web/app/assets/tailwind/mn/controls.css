@@ -578,7 +578,7 @@
   .opt:has(input:disabled) .opt-dot { background: var(--line); }
   .opt-why, .opt-note { font-size: var(--t-fine); color: var(--ink-4); }
 
-  .chip, .mchip, .tag, .count-pill, .token {
+  .chip, .tag, .count-pill, .token {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -708,7 +708,7 @@
   }
   .pill > a:hover { background: var(--hover); color: var(--ink); }
 
-  .avatar, .face-stack > *, .row-avatar, .person-face, .rep-face, .index-face, .qcite-face, .sheet-face {
+  .avatar, .face-stack > *, .row-avatar, .person-face, .index-face, .qcite-face, .sheet-face {
     width: 22px;
     height: 22px;
     flex: none;
