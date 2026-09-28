@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 import logging
 import threading
 
@@ -39,6 +40,21 @@ FROM fd.thread_guards WHERE id = %s
 
 LIVE = """
 SELECT channel_id, thread_ts FROM fd.thread_guards WHERE state IN ('warned', 'running')
+"""
+
+KEEP_NOTE = """
+UPDATE fd.thread_guards SET note_said = %s, note_text = %s, updated_at = now()
+WHERE id = %s
+"""
+
+NOTE_FOR = """
+SELECT note_said, note_text, note_ts FROM fd.thread_guards WHERE id = %s
+"""
+
+NOTE_POSTED = """
+UPDATE fd.thread_guards
+SET note_ts = %s, note_posted_at = now(), updated_at = now()
+WHERE id = %s
 """
 
 WARNED = """
@@ -183,6 +199,18 @@ def by_id(conn, guard_id):
 def case_of(conn, channel_id, thread_ts):
     row = conn.execute(ON_A_CASE, (channel_id, thread_ts)).fetchone()
     return row[0] if row else None
+
+
+def keep_note(conn, guard_id, said, text):
+    conn.execute(KEEP_NOTE, (json.dumps(said), text, guard_id))
+
+
+def note_for(conn, guard_id):
+    return conn.execute(NOTE_FOR, (guard_id,)).fetchone()
+
+
+def note_posted(conn, guard_id, ts):
+    conn.execute(NOTE_POSTED, (ts, guard_id))
 
 
 def open_guard(conn, kind, channel_id, thread_ts, by, reason, expires_at=None, case_id=None):

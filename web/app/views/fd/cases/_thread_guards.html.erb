@@ -10,6 +10,9 @@
           <%= thread_guard_chip(guard) %>
         </span>
         <span class="sub"><%= guard.reason %></span>
+        <% if guard.note_text.present? %>
+          <span class="lcite"><%= guard.note_text %></span>
+        <% end %>
         <span class="sub">
           <%= member_link(guard.opened_by) %> ·
           <%= guard.created_at.strftime("%-d %b %H:%M") %>

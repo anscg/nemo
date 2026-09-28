@@ -34,6 +34,20 @@ class FdThreadGuardsTest < ActionDispatch::IntegrationTest
     assert_match(/Thread destroyed/, actions_tab)
   end
 
+  test "the note left in the thread is shown with the guard" do
+    guard!(kind: "destroy", expires_at: nil, state: "done",
+      note_said: { "type" => "rich_text" }, note_text: "we took this down, here is why",
+      note_ts: "1700000000.000200", note_posted_at: Time.current)
+
+    assert_match(/we took this down, here is why/, actions_tab)
+  end
+
+  test "a destroy with no note says nothing extra" do
+    guard!(kind: "destroy", expires_at: nil, state: "done")
+
+    assert_no_match(/lcite/, actions_tab)
+  end
+
   test "a guard that failed is called out" do
     guard!(state: "failed", error: "the admin account could not be invited")
     said = actions_tab

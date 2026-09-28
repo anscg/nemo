@@ -40,6 +40,8 @@ module Fd
       won.positive? ? reload : nil
     end
 
+    def left_a_note? = note_text.present?
+
     def people_named
       [opened_by].compact
     end

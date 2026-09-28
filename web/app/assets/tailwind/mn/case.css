@@ -221,6 +221,17 @@
   .evdot.act { background: var(--accent-soft); color: var(--accent-deep); }
   .acts-now { border-top: 1px solid var(--line-soft); padding: var(--s-xs); display: flex; flex-direction: column; gap: 6px; }
   .acts-h { font-size: var(--t-fine); font-weight: 550; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-4); }
+  .lcite {
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-left: 2px solid var(--line);
+    border-radius: 0 var(--r-ctl) var(--r-ctl) 0;
+    background: var(--sunk);
+    font-size: var(--t-small);
+    color: var(--ink-2);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
   .qbar .action-icon, .ractions .action-icon { color: currentColor; opacity: 0.8; }
   .ractions > .faces { margin-right: var(--s-2xs); }
   .ractions > .faces::after {

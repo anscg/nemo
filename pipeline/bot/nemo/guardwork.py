@@ -71,6 +71,47 @@ def told(client, conn, channel_id, thread_ts, by):
         log.warning("nemo: could not say that %s was destroyed: %s", channel_id, failure)
 
 
+def signed(by):
+    return {
+        "type": "context",
+        "elements": [{"type": "mrkdwn", "text": f"Fire Department \u00b7 <@{by}>"}],
+    }
+
+
+def leave_note(client, guard_id, channel_id, thread_ts, by):
+    with session() as conn:
+        kept = guards.note_for(conn, guard_id)
+    if kept is None:
+        return None
+
+    note, text, already = kept
+    if already:
+        return already
+    if not note:
+        return None
+
+    try:
+        answer = client.chat_postMessage(
+            channel=channel_id, thread_ts=thread_ts, text=text,
+            blocks=[note, signed(by)], unfurl_links=False,
+        )
+    except Exception as failure:
+        log.warning("nemo: guard %s could not leave the note: %s", guard_id, failure)
+        return None
+
+    ts = (answer or {}).get("ts")
+    if ts:
+        with session() as conn:
+            guards.note_posted(conn, guard_id, ts)
+    return ts
+
+
+def still_there(said, thread_ts, note_ts=None):
+    kept = {thread_ts, note_ts} if note_ts else {thread_ts}
+    stamps = [one["ts"] for one in said if one.get("ts") and one["ts"] not in kept]
+    return stamps or [thread_ts]
+
+
 def names_for(client, said):
     named = {}
     for one in said:
@@ -114,6 +155,8 @@ def destroy(client, guard_id):
         guards.keep_transcript(conn, gid, channel_id, thread_ts, said, named)
     log.info("nemo: guard %s kept %s message(s) before deleting", gid, len(said))
 
+    note_ts = leave_note(client, gid, channel_id, thread_ts, by)
+
     deleted, failed = 0, None
     for _ in range(guards.MAX_PASSES):
         try:
@@ -124,9 +167,7 @@ def destroy(client, guard_id):
             failed = str(failure)[:200]
             break
 
-        stamps = [one["ts"] for one in said if one.get("ts") and one["ts"] != thread_ts]
-        if not stamps:
-            stamps = [thread_ts]
+        stamps = still_there(said, thread_ts, note_ts)
 
         gone = 0
         for ts in stamps:
