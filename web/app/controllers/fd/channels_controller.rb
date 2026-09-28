@@ -32,7 +32,7 @@ module Fd
       }
     end
 
-    TABS = %w[overview bots readonly slowmode account_age].freeze
+    TABS = %w[overview bots readonly slowmode account_age purge].freeze
 
     TAB_KINDS = {
       "bots" => ChannelGuard::BOT_ALLOWLIST,
@@ -54,10 +54,13 @@ module Fd
       @seat = ChannelMembership.inside?(@channel_id)
       @events = @kind ? ChannelGuardEvent.for_kind(@channel_id, @kind)
         .newest_first.limit(ACTIVITY_SHOWN).to_a : []
+      @purges = @tab == "purge" ? ChannelPurge.for_channel(@channel_id)
+        .newest_first.limit(ACTIVITY_SHOWN).to_a : []
       @labels = labels_for(@events)
       @app_ids = app_ids_for(@allows)
       @names = Names.for([@guards.values.flat_map(&:people_named),
-                          @allows.map(&:subject_id), @events.map(&:subject_id)])
+                          @allows.map(&:subject_id), @events.map(&:subject_id),
+                          @purges.flat_map(&:people_named)])
       load_pane
     end
 

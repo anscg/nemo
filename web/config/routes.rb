@@ -23,6 +23,7 @@ Rails.application.routes.draw do
     get "members/pane", to: "members#pane", as: :member_pane
     get "channels/pane", to: "channels#pane", as: :channel_pane
     get "channels/search", to: "channels#search", as: :channel_search
+    post "channels/:channel_id/purges", to: "channel_purges#create", as: :channel_purges
     post "channels/:channel_id/guards/:kind", to: "channel_guards#create", as: :channel_guard
     patch "channels/:channel_id/guards/:kind", to: "channel_guards#update"
     delete "channels/:channel_id/guards/:kind", to: "channel_guards#destroy"

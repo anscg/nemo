@@ -197,6 +197,13 @@ capabilities:
       - channel_allow/removed
       - app_setting/tuned
 
+  channel.purge:
+    label: Take down the last messages in a channel at once
+    area: channel
+    locked: true
+    logged: true
+    events: [channel_purge/queued, channel_purge/performed]
+
   engine.manage:
     label: Run and tune the engine
     area: engine

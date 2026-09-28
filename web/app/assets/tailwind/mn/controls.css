@@ -336,6 +336,14 @@
     transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   }
   .textarea { height: auto; min-height: 76px; padding: 8px 10px; resize: vertical; line-height: 1.55; }
+
+  input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
   .input-sm { height: var(--ctl-h-sm); padding: 0 8px; font-size: var(--t-small); }
   .field:focus, .input:focus, .textarea:focus, .select:focus,
   .qsearch-in:focus, .pick-input:focus, .note-input:focus {

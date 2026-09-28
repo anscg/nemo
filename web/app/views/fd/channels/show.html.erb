@@ -44,6 +44,10 @@
   <%= render "activity", events: @events, labels: @labels %>
 <% end %>
 
+<% if @tab == "purge" %>
+  <%= render "purge", channel_id: @channel_id, label: label, purges: @purges %>
+<% end %>
+
 <% if @kind_guard&.takes_allows? %>
   <%= render "allow_modal", channel_id: @channel_id, label: label,
         kind: @kind_guard.kind %>

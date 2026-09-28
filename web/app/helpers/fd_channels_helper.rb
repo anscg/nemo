@@ -17,7 +17,8 @@ module FdChannelsHelper
     "bots" => "Bots",
     "readonly" => "Read-only",
     "slowmode" => "Slow mode",
-    "account_age" => "New accounts"
+    "account_age" => "New accounts",
+    "purge" => "Purge"
   }.freeze
 
   def channel_tab_label(key)
@@ -37,6 +38,18 @@ module FdChannelsHelper
       title: on ? "turn it off" : "turn it on",
       aria: { label: on ? "turn it off" : "turn it on" },
       form: { class: "contents" }
+  end
+
+  PURGE_STATE = {
+    "asked" => ["waiting", "state-warn"],
+    "running" => ["running", "state-warn"],
+    "done" => ["done", "state-good"],
+    "failed" => ["failed", "state-crit"]
+  }.freeze
+
+  def purge_state_chip(purge)
+    said, tone = PURGE_STATE.fetch(purge.state, [purge.state, "state-off"])
+    tag.span(said, class: "state #{tone}")
   end
 
   def slowmode_line(guard)

@@ -6,7 +6,7 @@ from bot.core import loops, session
 from bot.nemo import automod, channel, channelguards, channels, chat, guards, guardwork
 from bot.nemo import memberguards, responses
 from bot.nemo import carriers
-from bot.nemo.carriers import sweep
+from bot.nemo.carriers import purge, sweep
 
 log = logging.getLogger("bot.nemo")
 
@@ -20,6 +20,7 @@ CHANNEL_GUARD = "fd_channel_guard"
 MEMBER_GUARD = "fd_member_guard"
 APP_SETTING = "fd_app_setting"
 AUTOMOD_WORD = "fd_automod_word"
+CHANNEL_PURGE = "fd_channel_purge"
 
 DEFAULT_SECONDS = 300
 DEFAULT_JOIN_SECONDS = 1800
@@ -119,6 +120,7 @@ def once(desk, channel_id=None):
         channel.firehouse_channel(conn)
         destroying = guards.pending(conn)
         lifting = guards.lifting(conn)
+        purging = [row[0] for row in purge.waiting(conn)]
 
     posted = each(missing, "still has no card", channel.post_report, client, channel_id)
     drawn = each(standing, "could not be redrawn", channel.redraw, client, channel_id)
@@ -138,6 +140,8 @@ def once(desk, channel_id=None):
         apart((f"destroying guard {guard_id}", lambda id=guard_id: guardwork.run_destroy(client, id)))
     for guard_id in lifting:
         apart((f"lifting guard {guard_id}", lambda id=guard_id: guardwork.lift_lock(client, id)))
+    for purge_id in purging:
+        apart((f"purging {purge_id}", lambda id=purge_id: purge.run(client, id)))
     for guard in taking_up:
         apart((f"taking up {guard['kind']} {guard['id']}",
                lambda one=guard: take_up(client, one)))
@@ -179,6 +183,11 @@ def start(desk, stopping, channel_id=None):
         elif channel_name == AUTOMOD_WORD:
             with session() as conn:
                 automod.refresh(conn)
+        elif channel_name == CHANNEL_PURGE:
+            threading.Thread(
+                target=purge.run, args=(desk.client, told),
+                name=f"nemo-purge-{told}", daemon=True,
+            ).start()
         elif channel_name == CHANNEL_GUARD:
             with session() as conn:
                 channelguards.refresh(conn)
@@ -202,7 +211,7 @@ def start(desk, stopping, channel_id=None):
     return (
         loops.watching(NAME,
                        (CASES, CHAT, OUTBOX, CONVERSATION, GUARD, CHANNEL_GUARD,
-                        MEMBER_GUARD, APP_SETTING, AUTOMOD_WORD),
+                        MEMBER_GUARD, APP_SETTING, AUTOMOD_WORD, CHANNEL_PURGE),
                        heard, stopping),
         loops.sweeping(NAME, every(), lambda: once(desk, channel_id), stopping),
         loops.sweeping(f"{NAME}-joins", every_join_sweep(), lambda: join_sweep(desk), stopping),
