@@ -20,6 +20,7 @@ module Fd
 
       now = Time.current
       reversed = false
+      lifted = nil
 
       writing do
         rows = Action.where(id: params[:action_id], case_id: kase.id, reversed_at: nil)
@@ -36,11 +37,11 @@ module Fd
             "reversed_by" => action.reversed_by,
             "reason" => reason
           })
+        lifted = lift_what_it_held(action, reason)
       end
 
       if reversed
-        redirect_to fd_case_path(kase, tab: "actions"),
-          notice: "action reversed, and the record keeps both"
+        redirect_to fd_case_path(kase, tab: "actions"), notice: reversed_notice(lifted)
       else
         redirect_to fd_case_path(kase, tab: "actions"),
           alert: "that action is not on this case, or was reversed already"
@@ -48,6 +49,28 @@ module Fd
     end
 
     private
+
+    def lift_what_it_held(action, reason)
+      guard = action.guard
+      return nil if guard.nil? || !MemberGuard::STILL_ON.include?(guard.state)
+      return nil if Action.live.exists?(guard_id: guard.id)
+
+      was = guard.state
+      lift_reason = "the action was reversed: #{reason}"
+      return nil unless guard.lift!(by: current_account.user_id, reason: lift_reason)
+
+      audit(guard, "lifted", before: { "state" => was },
+        after: { "state" => guard.state, "lift_reason" => lift_reason })
+      guard
+    end
+
+    def reversed_notice(guard)
+      return "action reversed, and the record keeps both" if guard.nil?
+
+      "action reversed, and the #{guard_said(guard)} it held is lifted"
+    end
+
+    def guard_said(guard) = FdHelper::ACTION_LABELS.fetch(guard.kind, guard.kind).downcase
 
     def objection(reason)
       if reason.blank?

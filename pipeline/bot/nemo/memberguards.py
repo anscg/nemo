@@ -399,6 +399,26 @@ def let_go(conn, guard_id, by, why, kind=None):
     return True
 
 
+GUARD_STILL_WANTED = """
+SELECT g.id, g.kind
+FROM fd.member_guards g
+JOIN fd.actions a ON a.guard_id = g.id
+WHERE a.id = %s AND g.state = 'live'
+  AND NOT EXISTS (
+    SELECT 1 FROM fd.actions o WHERE o.guard_id = g.id AND o.reversed_at IS NULL
+  )
+"""
+
+
+def lift_for_action(conn, action_id, by, why):
+    row = conn.execute(GUARD_STILL_WANTED, (action_id,)).fetchone()
+    if row is None:
+        return None
+
+    guard_id, kind = row
+    return guard_id if let_go(conn, guard_id, by, why, kind=kind) else None
+
+
 def lift_done(conn, guard_id):
     return conn.execute(LIFT_DONE, (guard_id,)).fetchone() is not None
 

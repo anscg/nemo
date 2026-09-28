@@ -39,6 +39,59 @@ class FdReversalsTest < ActionDispatch::IntegrationTest
     assert_equal 1, @kase.actions.count
   end
 
+  def make_guard(**attrs)
+    Fd::MemberGuard.create!({
+      kind: "deactivation", subject_id: "USUB", case_id: @kase.id, opened_by: "UFF1",
+      reason: "raiding", carried_by: "nemo", carry: "held"
+    }.merge(attrs))
+  end
+
+  test "reversing lifts the guard the action held, and waits on slack for it" do
+    sign_in_as(@me)
+    guard = make_guard
+    @action.update!(guard_id: guard.id)
+
+    reverse(reversal_reason: "appeal upheld")
+
+    guard.reload
+    assert_equal Fd::MemberGuard::LIFTING, guard.state, "nemo puts the account back first"
+    assert_nil guard.lifted_at, "it is not lifted until slack says the account is back"
+    assert_equal "UME", guard.lifted_by
+    assert_match(/appeal upheld/, guard.lift_reason)
+  end
+
+  test "reversing lifts a shush outright, since nothing has to be undone in slack" do
+    sign_in_as(@me)
+    guard = make_guard(kind: "shush", expires_at: 30.days.from_now)
+    @action.update!(guard_id: guard.id)
+
+    reverse
+
+    guard.reload
+    assert_equal Fd::MemberGuard::LIFTED, guard.state
+    assert_not_nil guard.lifted_at
+  end
+
+  test "a guard another live action still wants is left standing" do
+    sign_in_as(@me)
+    guard = make_guard
+    @action.update!(guard_id: guard.id)
+    make_action(guard_id: guard.id)
+
+    reverse
+
+    assert_not_nil @action.reload.reversed_at
+    assert_equal Fd::MemberGuard::LIVE, guard.reload.state
+  end
+
+  test "reversing an action that held nothing leaves the record alone" do
+    sign_in_as(@me)
+    reverse
+
+    assert_not_nil @action.reload.reversed_at
+    assert_equal 0, Fd::MemberGuard.count
+  end
+
   test "the paired columns move together, as the constraint requires" do
     sign_in_as(@me)
     reverse

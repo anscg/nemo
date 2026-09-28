@@ -3,7 +3,7 @@ import logging
 from psycopg.types.json import Jsonb
 
 from bot.core import audit
-from bot.nemo import cards
+from bot.nemo import cards, memberguards
 
 log = logging.getLogger("bot.nemo")
 
@@ -326,6 +326,8 @@ def resolve(conn, case_id, said, user_id):
     return told
 
 
+REVERSED_BECAUSE = "the action was reversed: {why}"
+
 REVERSE_ACTION = """
 UPDATE fd.actions SET reversed_at = now(), reversed_by = %s, reversal_reason = %s
 WHERE id = %s AND case_id = %s AND reversed_at IS NULL
@@ -347,6 +349,7 @@ def reverse_action(conn, case_id, action_id, reason, user_id):
         before={"reversed_at": None},
         after={"reversed_at": str(row[0]), "reversed_by": user_id, "reason": reason},
     )
+    memberguards.lift_for_action(conn, action_id, user_id, REVERSED_BECAUSE.format(why=reason))
     return True
 
 

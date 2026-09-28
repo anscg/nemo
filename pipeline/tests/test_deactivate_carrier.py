@@ -9,8 +9,9 @@ WHO = "U1"
 
 
 class Conn:
-    def __init__(self, lifts=True):
+    def __init__(self, lifts=True, finds=True):
         self.lifts = lifts
+        self.finds = finds
         self.ran = []
 
     def execute(self, sql, args=None):
@@ -19,7 +20,9 @@ class Conn:
 
     def fetchone(self):
         sql, _ = self.ran[-1]
-        if "state = 'lifting'" in sql:
+        if "JOIN fd.actions" in sql:
+            return (7, memberguards.DEACTIVATION) if self.finds else None
+        if "SET state = 'lifted'" in sql:
             return (7,) if self.lifts else None
         return (7,)
 
@@ -101,6 +104,22 @@ def test_a_lift_that_was_already_finished_says_so_once(took):
     conn = Conn(lifts=False)
     assert deactivate.let_go(Slack(), conn, guard())
     assert conn.did("INSERT INTO fd.member_guard_events") == []
+
+
+def test_reversing_the_last_live_action_lifts_what_it_held():
+    conn = Conn()
+    assert memberguards.lift_for_action(conn, 3, "UME", "the action was reversed: appeal") == 7
+
+    asked, args = conn.ran[0]
+    assert "o.reversed_at IS NULL" in asked, "a guard another live action wants must stay"
+    assert args == (3,)
+    assert conn.said("state = 'lifting'"), "a deactivation waits for slack before it is lifted"
+
+
+def test_reversing_an_action_that_held_nothing_lifts_nothing():
+    conn = Conn(finds=False)
+    assert memberguards.lift_for_action(conn, 3, "UME", "why") is None
+    assert not conn.said("UPDATE fd.member_guards")
 
 
 def test_only_a_deactivation_waits_for_slack_before_it_reads_as_lifted():
