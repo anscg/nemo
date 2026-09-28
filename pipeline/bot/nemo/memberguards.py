@@ -5,6 +5,9 @@ from bot.nemo.cards import action
 
 SHUSH = "shush"
 CHANNEL_BAN = "channel_ban"
+DEACTIVATION = "deactivation"
+
+UNDONE_IN_SLACK = (DEACTIVATION,)
 
 UNGUARDED = action.UNGUARDED
 ORPHANED = action.ORPHANED
@@ -333,6 +336,27 @@ WHERE id = %s AND state = 'live'
 RETURNING id
 """
 
+START_LIFTING = """
+UPDATE fd.member_guards
+SET state = 'lifting', lifted_by = %s, lift_reason = %s, updated_at = now()
+WHERE id = %s AND state = 'live'
+RETURNING id
+"""
+
+LIFT_DONE = """
+UPDATE fd.member_guards
+SET state = 'lifted', lifted_at = now(), updated_at = now()
+WHERE id = %s AND state = 'lifting'
+RETURNING id
+"""
+
+STILL_LIFTING = """
+SELECT id, kind, subject_id, channel_id, reason, expires_at
+FROM fd.member_guards
+WHERE state = 'lifting' AND carried_by = 'nemo'
+ORDER BY updated_at LIMIT 20
+"""
+
 ENDING_UNTOLD = """
 SELECT g.id, g.kind, g.subject_id, g.channel_id, g.reason, g.expires_at, g.case_id
 FROM fd.member_guards g
@@ -358,14 +382,29 @@ def dropped_awhile(conn):
     ]
 
 
-def let_go(conn, guard_id, by, why):
-    row = conn.execute(LET_GO, (by, why, guard_id)).fetchone()
+def undone_in_slack(kind):
+    return kind in UNDONE_IN_SLACK
+
+
+def let_go(conn, guard_id, by, why, kind=None):
+    waiting = undone_in_slack(kind)
+    sql = START_LIFTING if waiting else LET_GO
+    row = conn.execute(sql, (by, why, guard_id)).fetchone()
     if row is None:
         return False
 
+    landed = "lifting" if waiting else "lifted"
     audit.record(conn, "member_guard", guard_id, "lifted", by,
-                 before={"state": "live"}, after={"state": "lifted", "lift_reason": why})
+                 before={"state": "live"}, after={"state": landed, "lift_reason": why})
     return True
+
+
+def lift_done(conn, guard_id):
+    return conn.execute(LIFT_DONE, (guard_id,)).fetchone() is not None
+
+
+def still_lifting(conn):
+    return [dict(zip(WANTED, row)) for row in conn.execute(STILL_LIFTING).fetchall()]
 
 
 ENDING = "ending"

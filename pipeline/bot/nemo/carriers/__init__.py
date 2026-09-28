@@ -1,11 +1,14 @@
-from bot.nemo.carriers import account_age, channel_ban, purge, readonly, shush, slowmode
+from bot.nemo.carriers import (
+    account_age, channel_ban, deactivate, purge, readonly, shush, slowmode,
+)
 
-CARRIERS = {shush.KIND: shush, channel_ban.KIND: channel_ban}
+CARRIERS = {shush.KIND: shush, channel_ban.KIND: channel_ban,
+            deactivate.KIND: deactivate}
 
 CHANNEL_CARRIERS = (readonly, slowmode, account_age)
 
-__all__ = ["CARRIERS", "CHANNEL_CARRIERS", "account_age", "channel_ban", "purge",
-           "readonly", "shush", "slowmode"]
+__all__ = ["CARRIERS", "CHANNEL_CARRIERS", "account_age", "channel_ban", "deactivate",
+           "purge", "readonly", "shush", "slowmode"]
 
 
 def take_up(client, conn, guard):

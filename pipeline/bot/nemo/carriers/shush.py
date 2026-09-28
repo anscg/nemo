@@ -32,8 +32,10 @@ def take_up(client, conn, guard):
     return True
 
 
-def let_go(client, conn, guard):
-    carrying.tell_them(client, conn, guard, OVER)
+def let_go(client, conn, guard, tell=True):
+    if tell:
+        carrying.tell_them(client, conn, guard, OVER)
+    return True
 
 
 def remove(client, conn, guard, channel_id, ts):

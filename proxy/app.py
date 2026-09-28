@@ -20,6 +20,9 @@ from pydantic import BaseModel, Field
 from slack_sdk.errors import SlackApiError
 
 from internal_client import InternalApiError, InternalAuthError, InternalClient
+from scim_client import METHODS as SCIM_METHODS
+from scim_client import ScimError
+from scim_client import call as scim_call
 from slack_client import AUTH_ERRORS, admin_client, admin_token
 
 ENV_FILE = Path(__file__).resolve().parent / ".env"
@@ -63,6 +66,7 @@ WRITE_METHODS = {
             "conversations.kick",
             "admin.users.session.reset",
         }
+        | set(SCIM_METHODS)
     ),
 }
 
@@ -258,6 +262,14 @@ def call_admin(req: CallRequest):
     return admin_api_call(req.method, req.params).data
 
 
+def call_scim(req: CallRequest):
+    try:
+        return scim_call(req.method, req.params)
+    except RuntimeError as exc:
+        status = 502 if isinstance(exc, ScimError) else 503
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+
 @app.post("/file")
 def file(req: CallRequest, client: Client = Depends(current_client)):
     if req.method not in client.file_methods:
@@ -302,6 +314,8 @@ def call(req: CallRequest, client: Client = Depends(current_client)):
         )
 
     if req.credential == "admin":
+        if req.method in SCIM_METHODS:
+            return call_scim(req)
         try:
             return call_admin(req)
         except HTTPException as exc:

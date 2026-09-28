@@ -24,6 +24,8 @@ LIMITS = {
     ("pipeline", "admin", "conversations.info"): (TIER3, 120),
     ("pipeline", "admin", "search.messages"): (TIER2, 80),
     ("nemo", "admin", "admin.users.session.reset"): (TIER2, 0),
+    ("nemo", "admin", "scim.users.deactivate"): (TIER2, 0),
+    ("nemo", "admin", "scim.users.activate"): (TIER2, 0),
     ("nemo", "admin", "chat.delete"): (TIER3, 60, 30),
     ("nemo", "admin"): (TIER3, 60),
     ("pipeline", "admin"): (TIER4, 500),

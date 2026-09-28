@@ -48,8 +48,10 @@ def take_up(client, conn, guard):
     return True
 
 
-def let_go(client, conn, guard):
-    carrying.tell_them(client, conn, guard, OVER.format(room=guard["channel_id"]))
+def let_go(client, conn, guard, tell=True):
+    if tell:
+        carrying.tell_them(client, conn, guard, OVER.format(room=guard["channel_id"]))
+    return True
 
 
 def again(conn, guard, why):

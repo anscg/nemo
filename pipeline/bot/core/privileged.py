@@ -19,6 +19,11 @@ def mode():
     return said if said in MODES else LOG
 
 
+def deactivation_mode():
+    said = (os.environ.get("FD_DEACTIVATE") or LOG).strip().lower()
+    return said if said in MODES else LOG
+
+
 def strikes_needed():
     try:
         return max(int(os.environ["FD_SESSION_RESET_STRIKES"]), 1)
@@ -103,3 +108,36 @@ def reset_sessions(user_id):
 
     log.warning("privileged: reset every session for %s", user_id)
     return "reset"
+
+
+DEACTIVATE = "scim.users.deactivate"
+ACTIVATE = "scim.users.activate"
+
+DEACTIVATED = "deactivated"
+REACTIVATED = "reactivated"
+
+
+def carried(user_id, method, done, doing):
+    how = deactivation_mode()
+    if how == OFF:
+        return "off"
+    if how == LOG:
+        log.warning("privileged: would %s %s (FD_DEACTIVATE=log)", doing, user_id)
+        return "would"
+
+    try:
+        proxy().call(method, {"user_id": user_id}, credential="admin", max_retries=1)
+    except Exception as failure:
+        log.warning("privileged: could not %s %s: %s", doing, user_id, failure)
+        return f"failed: {str(failure)[:200]}"
+
+    log.warning("privileged: %s %s", done, user_id)
+    return done
+
+
+def deactivate(user_id):
+    return carried(user_id, DEACTIVATE, DEACTIVATED, "deactivate")
+
+
+def reactivate(user_id):
+    return carried(user_id, ACTIVATE, REACTIVATED, "put back")

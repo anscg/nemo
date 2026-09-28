@@ -81,6 +81,21 @@ def apart(*doing):
             log.exception("nemo: %s failed", name)
 
 
+def carry_now(client):
+    with session() as conn:
+        memberguards.refresh(conn)
+        taking_up = memberguards.uncarried(conn)
+        finishing = memberguards.still_lifting(conn)
+
+    for guard in taking_up:
+        apart((f"taking up {guard['kind']} {guard['id']}",
+               lambda one=guard: take_up(client, one)))
+    for guard in finishing:
+        apart((f"finishing the lift of {guard['kind']} {guard['id']}",
+               lambda one=guard: sweep.release_now(client, one)))
+    return len(taking_up) + len(finishing)
+
+
 def each(cases, doing, work, client, channel_id):
     done, failing = 0, 0
     for case_id in cases:
@@ -149,6 +164,7 @@ def once(desk, channel_id=None):
         ("clearing what the guard could not remove", lambda: guardwork.sweep_removals(client)),
         ("resetting sessions the guard has earned", guardwork.sweep_strikes),
         ("lifting what has run out", lambda: sweep.sweep_lapsed(client)),
+        ("finishing what is still lifting", lambda: sweep.sweep_lifting(client)),
         ("taking up what it dropped", lambda: sweep.sweep_dropped(client)),
         ("saying what is ending soon", lambda: sweep.sweep_ending(client)),
     )
@@ -196,12 +212,10 @@ def start(desk, stopping, channel_id=None):
                 name=f"nemo-seat-{told}", daemon=True,
             ).start()
         elif channel_name == MEMBER_GUARD:
-            with session() as conn:
-                memberguards.refresh(conn)
-                taking_up = memberguards.uncarried(conn)
-            for guard in taking_up:
-                apart((f"taking up {guard['kind']} {guard['id']}",
-                       lambda one=guard: take_up(desk.client, one)))
+            threading.Thread(
+                target=carry_now, args=(desk.client,),
+                name=f"nemo-member-guard-{told}", daemon=True,
+            ).start()
         elif channel_name == CONVERSATION:
             apart(("catching up", lambda: desk.caught_up(told)),
                   ("ticking", desk.tick_queued))

@@ -4,7 +4,11 @@ module Fd
 
     SHUSH = "shush".freeze
     CHANNEL_BAN = "channel_ban".freeze
-    KINDS = [SHUSH, CHANNEL_BAN].freeze
+    DEACTIVATION = "deactivation".freeze
+    KINDS = [SHUSH, CHANNEL_BAN, DEACTIVATION].freeze
+
+    UNDONE_IN_SLACK = [DEACTIVATION].freeze
+    DATELESS = [DEACTIVATION].freeze
 
     LIVE = "live".freeze
     LIFTING = "lifting".freeze
@@ -102,11 +106,16 @@ module Fd
 
     def lift!(by:, reason: nil)
       won = self.class.still_on.where(id: id).update_all(
-        state: LIFTED, lifted_at: Time.current, lifted_by: by,
-        lift_reason: reason, updated_at: Time.current
+        **lifting_columns, lifted_by: by, lift_reason: reason, updated_at: Time.current
       )
       won.positive? ? reload : nil
     end
+
+    def undone_in_slack?
+      UNDONE_IN_SLACK.include?(kind) && !by_hand?
+    end
+
+    def dateless? = DATELESS.include?(kind)
 
     def live? = state == LIVE
     def lifting? = state == LIFTING
@@ -127,6 +136,14 @@ module Fd
 
     def people_named
       [opened_by, lifted_by].compact
+    end
+
+    private
+
+    def lifting_columns
+      return { state: LIFTING } if undone_in_slack?
+
+      { state: LIFTED, lifted_at: Time.current }
     end
   end
 end

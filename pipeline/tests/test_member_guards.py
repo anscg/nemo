@@ -42,12 +42,25 @@ def test_the_actions_table_says_which_kinds_nemo_can_carry():
     assert action.guard_scope("channel_ban") == "channel"
 
 
-@pytest.mark.parametrize("type_key", ["warning", "temp_ban", "indef_ban",
-                                      "perma_ban", "locked_thread", "dm"])
+@pytest.mark.parametrize("type_key", ["warning", "locked_thread", "dm"])
 def test_a_kind_without_an_enforce_block_is_a_record_only(type_key):
     assert action.guard_kind(type_key) is None
     assert action.enforce(type_key) == {}
     assert not memberguards.enforceable(type_key)
+
+
+@pytest.mark.parametrize("type_key", ["temp_ban", "indef_ban", "perma_ban"])
+def test_a_ban_is_carried_as_a_deactivation_on_the_account(type_key):
+    assert action.guard_kind(type_key) == memberguards.DEACTIVATION
+    assert action.guard_scope(type_key) == "account"
+    assert action.guard_carry(type_key) == "applied"
+    assert memberguards.enforceable(type_key)
+
+
+def test_a_deactivation_is_never_looked_up_against_a_channel():
+    conn = Conn([guard(kind=memberguards.DEACTIVATION)])
+    memberguards.for_action(conn, "perma_ban", WHO, channel_id="C9")
+    assert conn.asked[0][1] == (WHO, memberguards.DEACTIVATION, None)
 
 
 def test_a_kind_nobody_declared_is_not_enforceable():

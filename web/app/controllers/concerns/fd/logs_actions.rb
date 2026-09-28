@@ -23,11 +23,18 @@ module Fd
       FdHelper::ACTION_LABELS.fetch(type_key, type_key)
     end
 
+    def deactivates?(key = type_key)
+      Action.guard_kind(key) == MemberGuard::DEACTIVATION
+    end
+
+    def may_deactivate? = current_account&.may?("member.deactivate")
+
     def action_objection(kase)
       return "pick what was done" unless FdHelper::ACTION_LABELS.key?(type_key)
       return thread_lock_objection(kase) if Action.from_thread_lock?(type_key)
       return "say who it was directed at" if target_user_id.blank?
       return "#{target_user_id} is not a member id" unless target_user_id.match?(MEMBER_ID)
+      return "#{type_name.downcase} is not yours to log" if deactivates? && !may_deactivate?
       if NEEDS_EXPIRY.include?(type_key)
         return "#{type_name.downcase} needs a date it runs until" if params[:expires_on].blank?
         return "#{params[:expires_on]} is not a date" if expiry.nil?

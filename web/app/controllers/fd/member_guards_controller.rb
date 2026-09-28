@@ -5,6 +5,8 @@ module Fd
     MEMBER_ID = /\A[UW][A-Z0-9]{2,}\z/
 
     def create
+      return refuse!("member.deactivate") if deactivating?(kind)
+
       problem = guard_objection
       if problem
         return redirect_to(fd_member_path(subject_id, do: "guard"),
@@ -25,6 +27,8 @@ module Fd
 
     def update
       guard = MemberGuard.still_on.find(params[:id])
+      return refuse!("member.deactivate", guard) if deactivating?(guard.kind)
+
       if expiry.nil?
         return redirect_to fd_member_path(guard.subject_id),
           alert: "say the date it should run until"
@@ -43,11 +47,13 @@ module Fd
 
     def destroy
       guard = MemberGuard.still_on.find(params[:id])
+      return refuse!("member.deactivate", guard) if deactivating?(guard.kind)
+
       was = guard.state
       writing do
         guard.lift!(by: current_account.user_id, reason: lift_reason)
         audit(guard, "lifted", before: { "state" => was },
-          after: { "state" => MemberGuard::LIFTED, "lift_reason" => lift_reason })
+          after: { "state" => guard.state, "lift_reason" => lift_reason })
       end
 
       redirect_to fd_member_path(guard.subject_id),
@@ -59,6 +65,10 @@ module Fd
     def subject_id = params[:member_id].to_s.upcase
 
     def kind = params[:kind].to_s
+
+    def may_deactivate? = current_account&.may?("member.deactivate")
+
+    def deactivating?(said) = said == MemberGuard::DEACTIVATION && !may_deactivate?
 
     def channel_id = params[:channel_id].to_s.strip
 
@@ -83,7 +93,9 @@ module Fd
       if kind == MemberGuard::CHANNEL_BAN && !channel_id.match?(SlackLink::CHANNEL)
         return "a channel ban needs a channel"
       end
-      return "say the date it runs until" if expiry.nil?
+      if expiry.nil? && !MemberGuard::DATELESS.include?(kind)
+        return "say the date it runs until"
+      end
       if params[:reason].to_s.strip.blank?
         return wrong!(:reason, "say why this is being held", params[:reason])
       end

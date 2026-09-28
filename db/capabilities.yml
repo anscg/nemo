@@ -21,6 +21,7 @@ roles:
       - thread.guard
       - member.note
       - member.guard
+      - member.deactivate
       - identity.read
       - slack.link
       - channel.read
@@ -148,6 +149,11 @@ capabilities:
       - member_guard/opened
       - member_guard/lifted
       - member_guard/extended
+
+  member.deactivate:
+    label: Deactivate a Slack account, and put it back
+    area: member
+    locked: true
 
   member.read:
     label: See member names in the analytics

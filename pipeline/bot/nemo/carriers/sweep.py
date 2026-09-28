@@ -34,15 +34,26 @@ def carrier_for(guard):
     return CARRIERS.get(guard["kind"])
 
 
+def release(client, conn, guard):
+    carrier = carrier_for(guard)
+    if carrier is None:
+        return True
+    return carrier.let_go(client, conn, guard, tell=tells_member(conn))
+
+
+def release_now(client, guard):
+    with session() as conn:
+        return release(client, conn, guard)
+
+
 def lapse(client, conn, guard):
-    if not memberguards.let_go(conn, guard["id"], memberguards.NEMO, LAPSED_BECAUSE):
+    if not memberguards.let_go(conn, guard["id"], memberguards.NEMO, LAPSED_BECAUSE,
+                               kind=guard["kind"]):
         return False
 
     memberguards.happened(conn, guard["id"], guard["subject_id"], guard["channel_id"],
                           "released", detail=LAPSED_BECAUSE)
-    carrier = carrier_for(guard)
-    if carrier is not None and tells_member(conn):
-        carrier.let_go(client, conn, guard)
+    release(client, conn, guard)
 
     log.info("nemo: %s %s on %s has run out and is lifted",
              guard["kind"], guard["id"], guard["subject_id"])
@@ -60,6 +71,19 @@ def sweep_lapsed(client):
             except Exception as failure:
                 log.warning("nemo: could not lift %s: %s", guard["id"], failure)
     return len(due)
+
+
+def sweep_lifting(client):
+    with session() as conn:
+        waiting = memberguards.still_lifting(conn)
+
+    for guard in waiting:
+        with session() as conn:
+            try:
+                release(client, conn, guard)
+            except Exception as failure:
+                log.warning("nemo: could not finish lifting %s: %s", guard["id"], failure)
+    return len(waiting)
 
 
 def sweep_dropped(client):

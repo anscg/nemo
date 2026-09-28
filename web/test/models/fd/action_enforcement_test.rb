@@ -9,9 +9,17 @@ class Fd::ActionEnforcementTest < ActiveSupport::TestCase
   end
 
   test "a kind without an enforce block is a record only" do
-    %w[warning temp_ban indef_ban perma_ban locked_thread dm].each do |type_key|
+    %w[warning locked_thread dm].each do |type_key|
       assert_nil Fd::Action.guard_kind(type_key), type_key
       assert_not Fd::Action.enforceable?(type_key), type_key
+    end
+  end
+
+  test "every ban is carried as a deactivation on the account" do
+    %w[temp_ban indef_ban perma_ban].each do |type_key|
+      assert_equal Fd::MemberGuard::DEACTIVATION, Fd::Action.guard_kind(type_key), type_key
+      assert_equal "account", Fd::Action.guard_scope(type_key), type_key
+      assert Fd::Action.enforceable?(type_key), type_key
     end
   end
 
@@ -21,7 +29,8 @@ class Fd::ActionEnforcementTest < ActiveSupport::TestCase
   end
 
   test "only the declared kinds are enforceable" do
-    assert_equal %w[shush channel_ban].sort, Fd::Action::ENFORCEABLE.sort
+    assert_equal %w[shush temp_ban indef_ban perma_ban channel_ban].sort,
+      Fd::Action::ENFORCEABLE.sort
   end
 
   test "every enforceable kind names a guard nemo knows" do
