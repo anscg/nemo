@@ -3,7 +3,8 @@ import os
 import threading
 
 from bot.core import loops, session
-from bot.nemo import channel, channelguards, channels, chat, guards, guardwork, memberguards
+from bot.nemo import automod, channel, channelguards, channels, chat, guards, guardwork
+from bot.nemo import memberguards
 from bot.nemo import carriers
 from bot.nemo.carriers import sweep
 
@@ -18,6 +19,7 @@ GUARD = "fd_thread_guard"
 CHANNEL_GUARD = "fd_channel_guard"
 MEMBER_GUARD = "fd_member_guard"
 APP_SETTING = "fd_app_setting"
+AUTOMOD_WORD = "fd_automod_word"
 
 DEFAULT_SECONDS = 300
 DEFAULT_JOIN_SECONDS = 1800
@@ -111,6 +113,7 @@ def once(desk, channel_id=None):
         guards.refresh(conn)
         channelguards.refresh(conn)
         memberguards.refresh(conn)
+        automod.refresh(conn)
         taking_up = memberguards.uncarried(conn)
         channel.firehouse_channel(conn)
         destroying = guards.pending(conn)
@@ -150,10 +153,10 @@ def once(desk, channel_id=None):
 
 def start(desk, stopping, channel_id=None):
     with session() as conn:
-        log.info("nemo: watching %s guarded thread(s), %s guarded channel(s) "
-                 "and %s shushed member(s)",
+        log.info("nemo: watching %s guarded thread(s), %s guarded channel(s), "
+                 "%s shushed member(s) and %s automod word(s)",
                  guards.refresh(conn), channelguards.refresh(conn),
-                 memberguards.refresh(conn))
+                 memberguards.refresh(conn), automod.refresh(conn))
 
     def heard(channel_name, told):
         if channel_name == CHAT:
@@ -170,6 +173,9 @@ def start(desk, stopping, channel_id=None):
         elif channel_name == APP_SETTING:
             with session() as conn:
                 channel.firehouse_channel(conn)
+        elif channel_name == AUTOMOD_WORD:
+            with session() as conn:
+                automod.refresh(conn)
         elif channel_name == CHANNEL_GUARD:
             with session() as conn:
                 channelguards.refresh(conn)
@@ -193,7 +199,7 @@ def start(desk, stopping, channel_id=None):
     return (
         loops.watching(NAME,
                        (CASES, CHAT, OUTBOX, CONVERSATION, GUARD, CHANNEL_GUARD,
-                        MEMBER_GUARD, APP_SETTING),
+                        MEMBER_GUARD, APP_SETTING, AUTOMOD_WORD),
                        heard, stopping),
         loops.sweeping(NAME, every(), lambda: once(desk, channel_id), stopping),
         loops.sweeping(f"{NAME}-joins", every_join_sweep(), lambda: join_sweep(desk), stopping),

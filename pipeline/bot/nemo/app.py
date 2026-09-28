@@ -7,6 +7,7 @@ from bot.nemo import channel, command, handlers, surface
 from bot.nemo.carriers import channel_ban, shush  # noqa: F401
 from lib.slack_client import RETRY_HANDLERS
 from bot.nemo.surface import (
+    automod_watch,  # noqa: F401
     bot_watch,  # noqa: F401
     channel_watch,  # noqa: F401
     reaction_watch,  # noqa: F401
