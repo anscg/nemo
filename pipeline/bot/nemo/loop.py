@@ -4,7 +4,7 @@ import threading
 
 from bot.core import loops, session
 from bot.nemo import automod, channel, channelguards, channels, chat, guards, guardwork
-from bot.nemo import memberguards
+from bot.nemo import memberguards, responses
 from bot.nemo import carriers
 from bot.nemo.carriers import sweep
 
@@ -114,6 +114,7 @@ def once(desk, channel_id=None):
         channelguards.refresh(conn)
         memberguards.refresh(conn)
         automod.refresh(conn)
+        responses.refresh(conn)
         taking_up = memberguards.uncarried(conn)
         channel.firehouse_channel(conn)
         destroying = guards.pending(conn)
@@ -157,6 +158,7 @@ def start(desk, stopping, channel_id=None):
                  "%s shushed member(s) and %s automod word(s)",
                  guards.refresh(conn), channelguards.refresh(conn),
                  memberguards.refresh(conn), automod.refresh(conn))
+        responses.refresh(conn)
 
     def heard(channel_name, told):
         if channel_name == CHAT:
@@ -173,6 +175,7 @@ def start(desk, stopping, channel_id=None):
         elif channel_name == APP_SETTING:
             with session() as conn:
                 channel.firehouse_channel(conn)
+                responses.refresh(conn)
         elif channel_name == AUTOMOD_WORD:
             with session() as conn:
                 automod.refresh(conn)
