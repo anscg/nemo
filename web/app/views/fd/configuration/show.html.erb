@@ -13,4 +13,8 @@
   <%= render "automod", words: @words, retired: @retired, matches: @matches %>
 <% end %>
 
+<% if @tab == "responses" %>
+  <%= render "responses" %>
+<% end %>
+
 <%= render "word_modal" %>

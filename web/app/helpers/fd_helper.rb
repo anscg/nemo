@@ -672,7 +672,7 @@ module FdHelper
     end
   end
 
-  CONFIGURATION_TAB_LABELS = { "automod" => "Automod" }.freeze
+  CONFIGURATION_TAB_LABELS = { "automod" => "Automod", "responses" => "Responses" }.freeze
 
   def configuration_tab_label(key)
     CONFIGURATION_TAB_LABELS.fetch(key) { key.tr("_", " ").capitalize }
