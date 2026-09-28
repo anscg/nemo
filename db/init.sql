@@ -93,6 +93,7 @@ BEGIN
 
     EXECUTE 'GRANT ALL ON SCHEMA app TO rails_app';
     EXECUTE 'GRANT USAGE ON SCHEMA analytics TO rails_app';
+    EXECUTE 'GRANT USAGE ON SCHEMA analytics TO pipeline_writer';
     EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE rails_app IN SCHEMA app '
         'GRANT SELECT, UPDATE ON TABLES TO pipeline_writer';
 

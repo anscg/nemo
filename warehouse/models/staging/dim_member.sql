@@ -1,3 +1,5 @@
+{{ config(post_hook="{{ grant_read('pipeline_writer') }}") }}
+
 with scoped as (
     select
         m.user_id,

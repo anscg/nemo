@@ -28,7 +28,7 @@ class Conn:
             return (self.left,) if self.left is not None else None
         if "INSERT INTO fd.member_joins" in sql:
             return (WHO,) if self.joined else None
-        if "FROM fd.member_joins" in sql:
+        if "fd.member_joins" in sql:
             return (self.left,) if self.left is not None else None
         return (1,)
 
@@ -297,3 +297,17 @@ def test_kinds_do_not_read_each_others_guards():
 
     assert channelguards.guarding(ROOM, channelguards.SLOWMODE) is None
     assert channelguards.guarding(ROOM, channelguards.READONLY) is not None
+
+
+def test_account_age_falls_back_to_when_the_account_was_claimed():
+    sql = account_age.DAYS_LEFT
+
+    assert "fd.member_joins" in sql
+    assert "analytics.dim_member" in sql
+    assert "coalesce(j.joined_at, m.claimed_at)" in sql, "a join event must win over the warehouse"
+
+
+def test_account_age_asks_nothing_of_a_member_neither_source_knows():
+    sql = account_age.DAYS_LEFT
+
+    assert "WHERE known.at IS NOT NULL" in sql, "an unknown member yields no row, so the gate opens"

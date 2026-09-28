@@ -24,9 +24,14 @@ RETURNING user_id
 """
 
 DAYS_LEFT = """
-SELECT ceil(extract(epoch FROM (joined_at + make_interval(days => %s)) - now()) / 86400)::int
-FROM fd.member_joins
-WHERE user_id = %s
+SELECT ceil(extract(epoch FROM (known.at + make_interval(days => %s)) - now()) / 86400)::int
+FROM (
+    SELECT coalesce(j.joined_at, m.claimed_at) AS at
+    FROM (SELECT %s::text AS user_id) asked
+    LEFT JOIN fd.member_joins j ON j.user_id = asked.user_id
+    LEFT JOIN analytics.dim_member m ON m.user_id = asked.user_id
+) known
+WHERE known.at IS NOT NULL
 """
 
 
