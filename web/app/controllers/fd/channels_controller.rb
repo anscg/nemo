@@ -6,7 +6,9 @@ module Fd
       @query = ChannelQuery.new(params)
       @rows = @query.rows
       @open_id = params[:open].to_s.presence
-      @joining = JoinStanding.new
+      @guards_on = LiveGuards.new(params[:kind])
+      @channels = @guards_on.channels
+      @names = Names.for(@guards_on.people)
     end
 
     ACTIVITY_SHOWN = 50
@@ -40,6 +42,8 @@ module Fd
       "slowmode" => ChannelGuard::SLOWMODE,
       "account_age" => ChannelGuard::ACCOUNT_AGE
     }.freeze
+
+    KIND_TABS = TAB_KINDS.invert.freeze
 
     def show
       @channel_id = params[:channel_id].to_s.strip.upcase

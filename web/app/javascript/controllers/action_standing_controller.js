@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static values = { url: String }
-  static targets = ["fields", "expiry", "channel", "locks", "aimed", "standing", "why", "cites"]
+  static targets = ["fields", "expiry", "channel", "locks", "aimed", "standing", "why"]
 
   connect() {
     this.fit()
@@ -44,6 +44,5 @@ export default class extends Controller {
     if (this.hasAimedTarget) this.aimedTarget.hidden = onThread
     if (this.hasStandingTarget) this.standingTarget.hidden = onThread
     if (this.hasWhyTarget) this.whyTarget.hidden = onThread
-    if (this.hasCitesTarget) this.citesTarget.hidden = onThread
   }
 }

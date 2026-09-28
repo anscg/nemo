@@ -29,6 +29,21 @@ module FdChannelsHelper
     GUARD_LABELS.fetch(kind, kind)
   end
 
+  def guard_tab(kind)
+    Fd::ChannelsController::KIND_TABS.fetch(kind, "overview")
+  end
+
+  def guard_setting_said(guard, allowed)
+    case guard.kind
+    when Fd::ChannelGuard::SLOWMODE then slowmode_line(guard)
+    when Fd::ChannelGuard::ACCOUNT_AGE then "#{pluralize(guard.min_age_days, 'day')} old to post"
+    when Fd::ChannelGuard::BOT_ALLOWLIST
+      allowed.positive? ? "#{pluralize(allowed, 'bot')} allowed" : "no bot allowed"
+    when Fd::ChannelGuard::READONLY
+      allowed.positive? ? "#{pluralize(allowed, 'person')} may post" : "nobody may post"
+    end
+  end
+
   def channel_guard_switch(channel_id, guard, kind: Fd::ChannelGuard::BOT_ALLOWLIST)
     on = guard.present?
     return nil unless current_account.may?("channel.guard")
@@ -134,37 +149,6 @@ module FdChannelsHelper
     return "n/a" if at.nil?
 
     at.in_time_zone(Time.zone).strftime("%-d %b %Y, %H:%M")
-  end
-
-  JOIN_MODES = {
-    Fd::AppSetting::ON => "Every channel",
-    Fd::AppSetting::GUARDED => "Guarded only",
-    Fd::AppSetting::OFF => "None"
-  }.freeze
-
-  def join_mode_said(mode)
-    tag.div(class: "segmented") do
-      join_mode_options(mode) { |_key, label, here| tag.span(label, "aria-pressed": here) }
-    end
-  end
-
-  def join_mode_options(mode)
-    safe_join(JOIN_MODES.map { |key, label| yield(key, label, (key == mode).to_s) })
-  end
-
-  def join_standing_line(joining)
-    return nil unless joining.swept?
-
-    said = ["in #{pluralize(joining.seated, 'channel')}"]
-    said << "#{joining.waiting} still to join" if joining.waiting.positive?
-    said.join(", ")
-  end
-
-  def join_unattended_said(joining)
-    return nil unless joining.swept? && joining.unattended.positive?
-
-    tag.p("nemo is not in #{pluralize(joining.unattended, 'guarded channel')}",
-      class: "sev-crit")
   end
 
   def vouched_line(allow)

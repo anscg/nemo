@@ -23,15 +23,6 @@ class FdMergedCaseTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "a thread from the folded case can be detached from the holding case" do
-    thread = Fd::CaseThread.create!(case_id: @folded.id, channel_id: "C0LOUNGE",
-      thread_ts: "1700.2", kind: "evidence", added_by: "UFF1")
-
-    delete fd_case_thread_path(@root, thread)
-
-    assert_nil Fd::CaseThread.find_by(id: thread.id), "detaching removes it"
-  end
-
   def report_on(kase, who, at:)
     report = Fd::CaseReport.create!(case_id: kase.id, reporter_user_id: who,
       is_anonymous: false, body: "#{who} said something", source_app: "shroud", received_at: at)

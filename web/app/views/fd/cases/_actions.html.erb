@@ -12,18 +12,6 @@
         <span class="sub"><%= action_reason(action) %></span>
         <span class="sub"><%= action_sentence(action) %></span>
 
-        <% cited = cited_messages[action.cites_message_id] if action.cites? %>
-        <% if cited %>
-          <div class="lcite">
-            <div><%= cited.readable? ? cited.body : "no text held" %></div>
-            <div class="sub">
-              <%= member_link(cited.author_user_id) %> ·
-              <%= channel_link(cited.channel_id) %> ·
-              <%= cited.posted_at.strftime("%-d %b %H:%M") %>
-            </div>
-          </div>
-        <% end %>
-
         <% standing = action_standing_line(action, kase) %>
         <% if standing %>
           <span class="sub"><%= standing %></span>

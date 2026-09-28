@@ -63,7 +63,7 @@ def test_the_locked_capabilities_are_fd_only_and_fixed():
     locked = [k for k, one in capabilities.capabilities(SAID).items() if one.get("locked")]
     assert locked == [
         "case.read", "case.open", "case.categorise", "case.note", "case.people",
-        "case.thread", "case.chat", "case.reply", "case.act", "case.resolve",
+        "case.chat", "case.reply", "case.act", "case.resolve",
         "case.reverse", "case.reopen", "thread.guard", "member.note", "member.guard",
         "identity.read",
         "channel.share", "channel.guard", "channel.purge",

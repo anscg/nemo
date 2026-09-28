@@ -31,8 +31,6 @@ module Fd
       inverse_of: :kase, dependent: nil
     has_many :notes, class_name: "Fd::Note", foreign_key: :case_id,
       inverse_of: :kase, dependent: nil
-    has_many :citations, -> { oldest_first }, class_name: "Fd::CaseCitation",
-      foreign_key: :case_id, inverse_of: :kase, dependent: nil
 
     scope :unresolved, -> { where(resolved_at: nil) }
     scope :not_duplicate, -> { where(duplicate_of: nil) }
@@ -244,10 +242,6 @@ module Fd
       resolved_at.present?
     end
 
-
-    def primary_thread
-      threads.detect(&:is_primary)
-    end
 
     def sibling_cases
       pairs = threads.evidence.map(&:coordinates)

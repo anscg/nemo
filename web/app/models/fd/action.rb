@@ -14,8 +14,6 @@ module Fd
     ENFORCEABLE = ENFORCE.keys.freeze
 
     belongs_to :kase, class_name: "Fd::Case", foreign_key: :case_id, inverse_of: :actions
-    belongs_to :cited_message, class_name: "Fd::ThreadMessage",
-      foreign_key: :cites_message_id, optional: true
     belongs_to :guard, class_name: "Fd::MemberGuard", foreign_key: :guard_id,
       optional: true, inverse_of: :actions
     belongs_to :thread_guard, class_name: "Fd::ThreadGuard", foreign_key: :thread_guard_id,
@@ -55,10 +53,6 @@ module Fd
     def from_thread_lock? = self.class.from_thread_lock?(type_key)
 
     def aimed_at_member? = target_user_id.present?
-
-    def cites?
-      cites_message_id.present?
-    end
 
     def expires?
       expires_at.present?

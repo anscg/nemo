@@ -12,7 +12,6 @@ roles:
       - case.categorise
       - case.note
       - case.people
-      - case.thread
       - case.chat
       - case.reply
       - case.act
@@ -90,12 +89,6 @@ capabilities:
     area: case
     locked: true
     events: [participant/attached, participant/detached]
-
-  case.thread:
-    label: Attach a thread, flag a message
-    area: case
-    locked: true
-    events: [thread/attached, thread/detached, citation/flagged, citation/unflagged]
 
   case.chat:
     label: Talk to the team on a case

@@ -79,9 +79,7 @@ module Fd
         { kind: "do", icon: "action", title: "Log an action", sub: on,
           key: "case.act", on: kase, url: fd_case_path(kase, do: "action") },
         { kind: "do", icon: "note", title: "Add a note", sub: on,
-          key: "case.note", url: fd_case_path(kase, do: "note") },
-        { kind: "do", icon: "thread", title: "Attach a thread", sub: on,
-          key: "case.thread", on: kase, url: fd_case_path(kase, do: "thread") }
+          key: "case.note", url: fd_case_path(kase, do: "note") }
       ].compact
     end
 

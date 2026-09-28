@@ -48,7 +48,7 @@ class AnalyticsFlagTest < ActionDispatch::IntegrationTest
     Fd::CaseThread.create!(case_id: kase.id, channel_id: "C0LOUNGE", thread_ts: "1.1",
       is_primary: true, added_by: @me.user_id)
 
-    get fd_case_path(kase, tab: "evidence")
+    get fd_case_path(kase)
     assert_response :success
   end
 end

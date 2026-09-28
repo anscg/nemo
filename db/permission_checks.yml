@@ -47,12 +47,6 @@ checks:
     case: theirs
     allowed: true
 
-  - name: a firefighter may attach a thread to somebody else's case
-    role: firefighter
-    key: case.thread
-    case: theirs
-    allowed: true
-
   - name: resolving is not scoped, so anybody holding it may resolve
     role: firefighter
     key: case.resolve

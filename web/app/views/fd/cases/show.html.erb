@@ -129,27 +129,6 @@
             notes: @standing_notes, mentioned: @mentioned, priors: @person_priors %>
     <% end %>
 
-    <% if @tab == "evidence" %>
-      <div class="section-head">
-        <h2 class="section-title">Evidence</h2>
-      </div>
-      <% if @thread_list.any? %>
-        <%= render "threads", kase: @case, threads: @thread_list,
-              flags: @citations, cited_by: @cited_by %>
-      <% else %>
-        <div class="empty">
-          <span class="empty-mark">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 6h16M4 11h10M4 16h13"/></svg>
-          </span>
-          <p class="empty-title">No evidence attached</p>
-          <div class="empty-do">
-            <%= opens_modal "case.thread", "Attach a thread", opens: "attach-thread",
-                  on: @case, css: "btn btn-primary" %>
-          </div>
-        </div>
-      <% end %>
-    <% end %>
-
     <% if @tab == "actions" %>
       <div class="section-head">
         <h2 class="section-title">Actions</h2>
@@ -161,8 +140,7 @@
         <%= render "thread_guards", guards: @thread_guards, names: names %>
       <% end %>
       <% if @actions.any? %>
-        <%= render "actions", kase: @case, actions: @actions,
-              cited_messages: @cited_messages %>
+        <%= render "actions", kase: @case, actions: @actions %>
       <% else %>
         <div class="empty">
           <span class="empty-mark">
@@ -281,7 +259,7 @@
        data-action-standing-url-value="<%= fd_case_standing_path(@case) %>">
   <%= form_with url: fd_case_actions_path(@case), method: :post, html: { autocomplete: "off" } do %>
     <div class="modal-body">
-      <%= render "action_fields", kase: @case, flagged: @flagged_messages, names: names,
+      <%= render "action_fields", kase: @case, names: names,
               standing: @action_standing, thread_locks: @thread_locks,
               guards_logged: @guards_logged, locks_logged: @locks_logged,
               target: @people.chosen&.user_id || lone_subject(@case) %>
@@ -293,36 +271,6 @@
     </div>
   <% end %>
   </div>
-<% end %>
-
-<%= render layout: "fd/modal", locals: { id: "attach-thread", title: "Attach a thread",
-      open: params[:do] == "thread" } do %>
-  <%= form_with url: fd_case_threads_path(@case), method: :post, html: { autocomplete: "off" } do %>
-    <div class="modal-body">
-      <label class="field-label">
-        Slack link
-        <%= text_field_tag :link, nil, class: "input", id: nil,
-              placeholder: "https://hackclub.slack.com/archives/C0266FRGV/p1754487721123456" %>
-      </label>
-      <div class="field-label">
-        <span>What that thread is</span>
-        <div class="segmented seg-radio">
-          <label>
-            <%= radio_button_tag :kind, "evidence", true, id: nil %>
-            Evidence
-          </label>
-          <label>
-            <%= radio_button_tag :kind, "internal", false, id: nil %>
-            Internal discussion
-          </label>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button type="button" class="btn btn-ghost" data-action="click->modal#shut">Cancel</button>
-      <%= submit_tag "Attach", class: "btn btn-primary" %>
-    </div>
-  <% end %>
 <% end %>
 
 <%= render layout: "fd/modal", locals: { id: "set-category",

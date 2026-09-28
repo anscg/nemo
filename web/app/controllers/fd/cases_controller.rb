@@ -6,7 +6,7 @@ module Fd
     permit "case.open", only: :create
     permit "case.categorise", on: -> { Case.find(params[:id]) }, only: :update
 
-    TABS = %w[report people evidence actions notes timeline].freeze
+    TABS = %w[report people actions notes timeline].freeze
 
     def index
       @open_modal = params[:open] == "1"
@@ -55,21 +55,12 @@ module Fd
       @thread_messages = ThreadMessage.for_threads(@threads).to_a
       @case_person = CasePerson.for(@people.chosen, kase: @case, actions: @actions,
         notes: @notes, messages: @thread_messages)
-      @thread_list = CaseThreads.for(@threads, actions: @actions,
-        messages: @thread_messages, asked: params[:thread])
-      @citations = CaseCitation.where(case_id: family).oldest_first
-        .index_by(&:thread_message_id)
-      @flagged_messages = @thread_messages.select { |said| @citations.key?(said.id) }
-      @cited_by = @actions.select(&:cites?).group_by(&:cites_message_id)
-      @cited_messages = cited_messages
       @cited_shares = IntakeShare.for_messages(@conversation_said.map(&:id))
-      @channels = ChannelNames.for(@threads.map(&:channel_id) +
-        @cited_messages.values.map(&:channel_id) + cited_channel_ids +
+      @channels = ChannelNames.for(@threads.map(&:channel_id) + cited_channel_ids +
         @thread_guards.map(&:channel_id) + @thread_locks.map(&:channel_id) +
         @action_standing.map(&:channel_id) +
         @actions.filter_map { |a| a.details["channel_id"] } +
         Array(@pane_channels))
-      @said_counts = @thread_messages.group_by(&:author_user_id).transform_values(&:size)
       @person_priors = Case.prior_counts_for(@participants.map(&:user_id))
       @assignees = @case.assignees.to_a
       @mentioned = @case.mentioned_but_unlogged(
@@ -96,7 +87,6 @@ module Fd
       @tab = params[:tab].presence_in(TABS) || (@case.resolved? ? "actions" : "report")
       @tab_counts = {
         "report" => @reports.size,
-        "evidence" => @thread_messages.size.positive? ? @thread_messages.size : @thread_list.size,
         "actions" => @actions.size,
         "notes" => @notes.size,
         "people" => @participants.size,
@@ -173,12 +163,6 @@ module Fd
       (@cited_shares || {}).values.flatten.map(&:source_author_user_id).compact
     end
 
-    def cited_messages
-      wanted = @cited_by.keys - @thread_messages.map(&:id)
-      held = @thread_messages.index_by(&:id)
-      held.merge(ThreadMessage.where(id: wanted).index_by(&:id))
-    end
-
     def page_ids
       [
         @case.opened_by,
@@ -192,7 +176,6 @@ module Fd
         @reports.flat_map { |report| Mentions.ids(report.body) },
         @thread_messages.map(&:author_user_id),
         @thread_messages.map(&:purged_by),
-        @citations.values.map(&:flagged_by),
         @threads.map(&:added_by),
         @erasures.map(&:actor_user_id),
         cited_authors,

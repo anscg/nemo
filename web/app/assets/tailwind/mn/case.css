@@ -221,18 +221,6 @@
   .evdot.act { background: var(--accent-soft); color: var(--accent-deep); }
   .acts-now { border-top: 1px solid var(--line-soft); padding: var(--s-xs); display: flex; flex-direction: column; gap: 6px; }
   .acts-h { font-size: var(--t-fine); font-weight: 550; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-4); }
-  .lcite {
-    margin-top: 6px;
-    padding: 6px 10px;
-    border-left: 2px solid var(--line);
-    border-radius: 0 var(--r-ctl) var(--r-ctl) 0;
-    background: var(--sunk);
-    font-size: var(--t-small);
-    color: var(--ink-2);
-    overflow-wrap: anywhere;
-  }
-  .lcite .sub { margin-top: 3px; }
-
   .qbar .action-icon, .ractions .action-icon { color: currentColor; opacity: 0.8; }
   .ractions > .faces { margin-right: var(--s-2xs); }
   .ractions > .faces::after {
@@ -285,66 +273,6 @@
     background: var(--card-2);
   }
   .rail-line { font-size: var(--t-small); color: var(--ink-2); line-height: 1.5; }
-
-  .sheet { display: flex; flex-direction: column; padding: 0 var(--s-sm) var(--s-sm); }
-  .sheet-day, .chat-day {
-    display: flex;
-    align-items: center;
-    gap: var(--s-xs);
-    margin: var(--s-md) 0 var(--s-2xs);
-    color: var(--ink-4);
-    font-size: var(--t-fine);
-    font-weight: 500;
-  }
-  .sheet-day::before, .sheet-day::after, .chat-day::before, .chat-day::after {
-    content: "";
-    height: 1px;
-    flex: 1 1 auto;
-    background: var(--line-soft);
-  }
-  .sheet-row {
-    display: grid;
-    grid-template-columns: 26px minmax(0, 1fr);
-    gap: var(--s-xs);
-    padding: 8px 0;
-    border-bottom: 1px solid var(--line-soft);
-  }
-  .sheet-row:last-child { border-bottom: 0; }
-  .sheet-row.is-flagged { background: color-mix(in oklab, var(--warn) 6%, transparent); margin: 0 calc(var(--s-xs) * -1); padding-inline: var(--s-xs); border-radius: var(--r-ctl); }
-  .sheet-gutter { display: grid; place-items: center; padding-top: 1px; }
-  .sheet-mark {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: var(--warn-soft);
-    color: var(--warn);
-    font-family: var(--font-code);
-    font-size: var(--t-mark);
-    font-weight: 600;
-  }
-  .sheet-body { min-width: 0; }
-  .sheet-who { display: flex; align-items: baseline; gap: var(--s-2xs); }
-  .sheet-name { font-weight: 600; color: var(--ink); }
-  .sheet-at { font-family: var(--font-code); font-size: var(--t-mark); color: var(--ink-4); }
-  .sheet-text, .sheet-said { margin: 2px 0 0; line-height: 1.55; overflow-wrap: anywhere; color: var(--ink); }
-  .sheet-under { display: flex; align-items: center; gap: 5px; margin-top: 4px; font-size: var(--t-fine); color: var(--ink-4); }
-  .sheet-loose { color: var(--warn); }
-  .sheet-none {
-    display: flex;
-    align-items: center;
-    gap: var(--s-xs);
-    padding: var(--s-xs) var(--s-sm);
-    margin: var(--s-xs) var(--s-sm);
-    border: 1px solid var(--line);
-    border-radius: var(--r-card);
-    background: var(--card-2);
-    color: var(--ink-3);
-    font-size: var(--t-small);
-  }
-  .sheet-by { font-size: var(--t-fine); color: var(--ink-3); }
 
   .chatwrap {
     display: grid;
@@ -599,8 +527,4 @@
   .facet-tick { display: inline-flex; align-items: center; justify-content: center; color: var(--accent-on); }
 
   .when, .when-channel, .when-expiry { font-size: var(--t-small); color: var(--ink-2); }
-
-  @media (max-width: 899px) {
-    .sheet-row { grid-template-columns: 22px minmax(0, 1fr); }
-  }
 }

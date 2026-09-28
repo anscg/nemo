@@ -213,7 +213,7 @@
   }
   html[data-mod="meta"] .mod-ctrl, html[data-mod="ctrl"] .mod-meta { display: none; }
 
-  .btn-primary .kbd, .btn-accent .kbd, .btn-primary .seg-count {
+  .btn-primary .kbd, .btn-accent .kbd {
     background: oklch(100% 0 0 / 0.3);
     border-radius: var(--r-hair);
     color: var(--pri-ink);
@@ -263,13 +263,6 @@
     color: var(--ink);
     box-shadow: var(--shadow-1);
   }
-  .seg-count {
-    font-family: var(--font-code);
-    font-size: var(--t-mark);
-    color: var(--ink-4);
-  }
-  .segmented > [aria-current="true"] .seg-count { color: var(--ink-3); }
-
   .views {
     display: flex;
     align-items: stretch;
@@ -708,7 +701,7 @@
   }
   .pill > a:hover { background: var(--hover); color: var(--ink); }
 
-  .avatar, .face-stack > *, .row-avatar, .person-face, .index-face, .qcite-face, .sheet-face {
+  .avatar, .face-stack > *, .row-avatar, .person-face, .index-face, .qcite-face {
     width: 22px;
     height: 22px;
     flex: none;

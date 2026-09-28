@@ -55,7 +55,6 @@ module Fd
         performed_at: at,
         source_app: Audit::SOURCE_APP,
         expires_at: expiry,
-        cites_message_id: cited_message_id(kase),
         reason: params[:reason].to_s.strip,
         category_key: chosen_category(kase),
         details: channel
@@ -162,13 +161,6 @@ module Fd
       return asked if Case::CATEGORIES.include?(asked)
 
       kase.category_key
-    end
-
-    def cited_message_id(kase)
-      asked = params[:cites_message_id].presence
-      return nil if asked.nil?
-
-      ThreadMessage.for_threads(kase.threads.to_a).find_by(id: asked)&.id
     end
 
     def expiry

@@ -39,12 +39,4 @@
     </label>
     <%= field_wrong(:reason) %>
   </div>
-  <% if flagged.any? %>
-    <label class="field-label" data-action-standing-target="cites">
-      Which flagged message it is about
-      <%= select_tag :cites_message_id,
-            options_for_select([["nothing in particular", ""]] + cite_options(flagged)),
-            class: "select", id: nil %>
-    </label>
-  <% end %>
 </div>

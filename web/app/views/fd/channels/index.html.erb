@@ -4,42 +4,49 @@
   <%= render "pane", query: @query, rows: @rows, open_id: @open_id %>
 <% end %>
 
-<section class="section">
-  <div class="section-head">
-    <h2 class="section-title">Channels nemo joins</h2>
-    <p class="section-note"><%= join_standing_line(@joining) %></p>
-    <div class="section-tools">
-      <%= join_mode_said(@joining.mode) %>
-    </div>
-  </div>
-  <%= join_unattended_said(@joining) %>
-</section>
-
-<section class="section">
-  <div class="section-head">
-    <h2 class="section-title">Could not join</h2>
-  </div>
-
-  <div class="card card-flush">
-    <% if @joining.refusals.any? %>
-      <div class="people-list">
-        <% @joining.refusals.each do |one| %>
-          <div class="line-row fat">
-            <span class="grow two-line">
-              <b><%= link_to one.label, fd_channel_path(one.channel_id), class: "lnk" %></b>
-              <span class="mono"><%= one.channel_id %></span>
-            </span>
-            <span class="row-right">
-              <span class="sub2"><%= one.why.presence || "refused" %></span>
-              <span class="sub2 mono"><%= at_minute(one.at) %></span>
-            </span>
-          </div>
-        <% end %>
-      </div>
-    <% else %>
-      <div class="empty">
-        <p class="empty-title">Nothing refused</p>
-      </div>
+<% content_for :page_tabs do %>
+  <%= link_to fd_channels_path, class: "view",
+        aria: { current: ("true" if @guards_on.kind.nil?) } do %>
+    All
+    <span class="view-count"><%= @guards_on.total %></span>
+  <% end %>
+  <% Fd::ChannelGuard::KINDS.each do |kind| %>
+    <%= link_to fd_channels_path(kind: kind), class: "view",
+          aria: { current: ("true" if @guards_on.kind == kind) } do %>
+      <%= guard_label(kind) %>
+      <span class="view-count"><%= @guards_on.tally[kind].to_i %></span>
     <% end %>
+  <% end %>
+<% end %>
+
+<div class="card card-flush">
+  <div class="card-head">
+    <h2 class="card-title">Guards</h2>
   </div>
-</section>
+
+  <% if @guards_on.any? %>
+    <div class="people-list">
+      <% @guards_on.rows.each do |guard| %>
+        <% here = fd_channel_path(guard.channel_id, tab: guard_tab(guard.kind)) %>
+        <div class="line-row fat">
+          <span class="grow two-line">
+            <b><%= link_to channels[guard.channel_id], here, class: "lnk" %></b>
+            <span>
+              <%= guard_label(guard.kind) %>
+              <span aria-hidden="true">&middot;</span>
+              <%= guard_setting_said(guard, @guards_on.allowed(guard)) %>
+            </span>
+          </span>
+          <span class="row-right">
+            <span class="sub2"><%= member_link(guard.opened_by) %></span>
+            <span class="sub2"><%= ago_label(guard.created_at) %></span>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="empty">
+      <p class="empty-title"><%= @guards_on.kind ? "None on" : "No guard is on" %></p>
+    </div>
+  <% end %>
+</div>

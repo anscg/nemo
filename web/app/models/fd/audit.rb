@@ -11,7 +11,6 @@ module Fd
       "Fd::CaseParticipant" => "participant",
       "Fd::CaseAssignee" => "assignee",
       "Fd::MemberIdentity" => "identity",
-      "Fd::CaseCitation" => "citation",
       "Engine::Setting" => "engine_setting",
       "Ingest::IncidentAck" => "incident_ack",
       "SyncRequest" => "sync_request",

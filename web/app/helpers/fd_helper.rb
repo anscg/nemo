@@ -390,30 +390,6 @@ module FdHelper
     "also open"
   end
 
-  def flagged_count(row, flags)
-    row.messages.count { |said| flags.key?(said.id) }
-  end
-
-  def shown_messages(row, flags, only)
-    return row.messages unless only == "flagged"
-
-    row.messages.select { |said| flags.key?(said.id) }
-  end
-
-  def evidence_empty_note(row, only)
-    return "Nothing in this thread is flagged." if only == "flagged"
-
-    "No messages held for this thread yet."
-  end
-
-  def citation_numbers(flags)
-    flags.keys.each_with_index.to_h { |id, i| [id, "E#{i + 1}"] }
-  end
-
-  def messages_by_day(messages)
-    messages.group_by { |said| said.posted_at.to_date }
-  end
-
   def age_ink(seconds)
     return "age-crit" if seconds >= AGE_CRIT
     return "age-warn" if seconds >= AGE_WARN
@@ -980,7 +956,7 @@ module FdHelper
   end
 
   CASE_TAB_LABELS = {
-    "report" => "Report", "people" => "People", "evidence" => "Evidence",
+    "report" => "Report", "people" => "People",
     "actions" => "Actions", "notes" => "Notes", "timeline" => "Timeline"
   }.freeze
 
@@ -1150,15 +1126,6 @@ module FdHelper
     parts << channel if channel.present?
     parts << "via #{action.source_app}" if action.source_app != "fire_engine"
     parts.join(" · ").presence
-  end
-
-  def cite_options(messages)
-    messages.map do |said|
-      words = said.body.to_s.truncate(60)
-      shown = "#{said.channel_id} #{said.posted_at.strftime('%-d %b %H:%M')} " \
-        "#{names[said.author_user_id]}: #{words.presence || 'no text held'}"
-      [shown, said.id]
-    end
   end
 
   def fact_number(value)
