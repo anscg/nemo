@@ -88,7 +88,7 @@ class YouPageTest < ActionDispatch::IntegrationTest
     staff = hold_role!("UYOU6", "community_manager")
     sign_in_as(staff)
 
-    get root_path
+    get community_path
 
     assert_response :success
     assert_select "a[href=?]", you_path

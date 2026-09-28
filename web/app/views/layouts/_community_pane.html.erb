@@ -13,8 +13,8 @@
     <% if may_community?("analytics.workspace.read") %>
       <p class="cnav-lab">The journey</p>
       <div class="cnav-group">
-        <%= link_to root_path, title: "Overview",
-              aria: { current: ("page" if current_page?(root_path)) } do %>
+        <%= link_to community_path, title: "Overview",
+              aria: { current: ("page" if on_community_overview?) } do %>
           <%= nav_icon("overview") %><span class="trunc">Overview</span>
         <% end %>
         <div class="cnav-sub">
@@ -29,8 +29,8 @@
       </div>
     <% else %>
       <div class="cnav-group">
-        <%= link_to root_path, title: "Overview",
-              aria: { current: ("page" if current_page?(root_path)) } do %>
+        <%= link_to community_path, title: "Overview",
+              aria: { current: ("page" if on_community_overview?) } do %>
           <%= nav_icon("overview") %><span class="trunc">Overview</span>
         <% end %>
       </div>

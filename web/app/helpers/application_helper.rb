@@ -186,8 +186,8 @@ module ApplicationHelper
         tally: Fd::Case.unresolved.not_duplicate.unassigned.count, here: page_section == "fd")
     end
     if on?(:analytics)
-      stops << RailStop.new(key: "mn", label: "Community", icon: "community", path: root_path,
-        here: page_section == "mn" && controller_name != "engine")
+      stops << RailStop.new(key: "mn", label: "Community", icon: "community",
+        path: community_path, here: page_section == "mn" && controller_name != "engine")
     end
     if may_community?("ops.engine")
       stops << RailStop.new(key: "engine", label: "Engine", icon: "engine", path: engine_path,
@@ -198,6 +198,10 @@ module ApplicationHelper
         here: page_section == "admin")
     end
     @rail_stops = stops
+  end
+
+  def on_community_overview?
+    controller_name == "home" && action_name == "index"
   end
 
   def here_stop(fire_engine:)

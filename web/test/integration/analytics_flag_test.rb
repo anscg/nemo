@@ -20,7 +20,7 @@ class AnalyticsFlagTest < ActionDispatch::IntegrationTest
   test "with it off, every analytics page sends you to the queue" do
     turn_it_off
 
-    [root_path, channels_path, engine_path].each do |where|
+    [community_path, channels_path, engine_path].each do |where|
       get where
       assert_redirected_to fd_cases_path
       assert_match(/community analytics is turned off/, flash[:alert])
@@ -38,7 +38,7 @@ class AnalyticsFlagTest < ActionDispatch::IntegrationTest
     get channels_path
     assert_response :success
 
-    get root_path
+    get community_path
     assert_response :success
   end
 

@@ -1,4 +1,5 @@
 class HomeController < ApplicationController
+  before_action :fire_engine_first, only: :index
   before_action { needs(:analytics) }
 
   OPEN_SHOWN = 25
@@ -11,6 +12,13 @@ class HomeController < ApplicationController
   end
 
   private
+
+  def fire_engine_first
+    return unless request.path == root_path
+    return unless may_use_fire_engine?
+
+    redirect_to fd_root_path
+  end
 
   def front_door
     @open_channels = Channels::Audience.open_to_all

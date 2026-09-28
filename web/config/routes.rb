@@ -127,5 +127,6 @@ Rails.application.routes.draw do
 
   get "workspace-logo", to: "workspace_logo#show", as: :workspace_logo
 
+  get "community", to: "home#index", as: :community
   root "home#index"
 end
