@@ -3,25 +3,40 @@ module Fd
     permit "channel.guard"
 
     def create
-      channel_id = params[:channel_id].to_s.strip.upcase
-      if ChannelGuard.live_for(channel_id)
-        return refuse(channel_id, "this channel is guarded already")
-      end
+      return refuse("that is not a kind of guard") unless ChannelGuard.kind?(kind)
+      return refuse("this channel is guarded already") if live_guard
+
+      problem = settings_objection
+      return refuse(problem) if problem
 
       writing do
-        guard = ChannelGuard.create!(kind: ChannelGuard::BOT_ALLOWLIST, channel_id: channel_id,
-          opened_by: current_account.user_id)
-        audit(guard, "opened")
+        guard = ChannelGuard.create!(kind: kind, channel_id: channel_id,
+          settings: asked_settings, opened_by: current_account.user_id)
+        audit(guard, "opened", after: guard.settings)
       end
 
-      redirect_to fd_channel_path(channel_id),
-        notice: "the guard is on, and nothing is on the allow list yet"
+      redirect_to here, notice: "#{guard_said} is on"
+    end
+
+    def update
+      guard = live_guard
+      return refuse("this channel is not guarded that way") if guard.nil?
+
+      problem = settings_objection
+      return refuse(problem) if problem
+
+      was = guard.settings
+      writing do
+        guard.update!(settings: was.merge(asked_settings), updated_at: Time.current)
+        audit(guard, "tuned", before: was, after: guard.settings)
+      end
+
+      redirect_to here, notice: "#{guard_said} changed"
     end
 
     def destroy
-      channel_id = params[:channel_id].to_s.strip.upcase
-      guard = ChannelGuard.live_for(channel_id)
-      return refuse(channel_id, "this channel is not guarded") if guard.nil?
+      guard = live_guard
+      return refuse("this channel is not guarded that way") if guard.nil?
 
       writing do
         guard.update!(state: "lifted", lifted_at: Time.current,
@@ -29,13 +44,66 @@ module Fd
         audit(guard, "lifted")
       end
 
-      redirect_to fd_channel_path(channel_id), notice: "the guard is off, the list is kept"
+      redirect_to here, notice: "#{guard_said} is off, the list is kept"
     end
 
     private
 
-    def refuse(channel_id, why)
-      redirect_to fd_channel_path(channel_id), alert: why
+    def channel_id
+      @channel_id ||= params[:channel_id].to_s.strip.upcase
+    end
+
+    def kind
+      @kind ||= params[:kind].to_s
+    end
+
+    def live_guard
+      @live_guard ||= ChannelGuard.live_for(channel_id, kind: kind)
+    end
+
+    def guard_said
+      FdChannelsHelper::GUARD_LABELS.fetch(kind, kind).downcase
+    end
+
+    def here
+      fd_channel_path(channel_id, tab: kind)
+    end
+
+    def asked_settings
+      case kind
+      when ChannelGuard::SLOWMODE
+        { "seconds" => seconds, "threads" => params[:threads].present? }
+      when ChannelGuard::ACCOUNT_AGE
+        { "min_age_days" => min_age_days }
+      else
+        {}
+      end
+    end
+
+    def seconds
+      params[:seconds].to_s.strip.to_i
+    end
+
+    def min_age_days
+      params[:min_age_days].to_s.strip.to_i
+    end
+
+    def settings_objection
+      case kind
+      when ChannelGuard::SLOWMODE
+        return "say how many seconds, from 1 to #{ChannelGuard::SLOWEST}" unless
+          seconds.between?(1, ChannelGuard::SLOWEST)
+      when ChannelGuard::ACCOUNT_AGE
+        return "say how many days, from 1 to #{ChannelGuard::OLDEST}" unless
+          min_age_days.between?(1, ChannelGuard::OLDEST)
+      end
+
+      nil
+    end
+
+    def refuse(why)
+      redirect_to fd_channel_path(channel_id, tab: ChannelGuard.kind?(kind) ? kind : nil),
+        alert: why
     end
   end
 end

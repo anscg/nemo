@@ -10,6 +10,10 @@ module Fd
       inverse_of: :events
 
     scope :newest_first, -> { order(at: :desc) }
+    scope :for_kind, ->(channel_id, kind) {
+      where(channel_id: channel_id,
+        guard_id: ChannelGuard.where(channel_id: channel_id, kind: kind).select(:id))
+    }
     scope :turned_away, -> { where(verb: [KICKED, DELETED]) }
 
     def readonly?

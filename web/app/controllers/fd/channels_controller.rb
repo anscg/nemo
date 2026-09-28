@@ -32,18 +32,31 @@ module Fd
       }
     end
 
+    TABS = %w[overview bots readonly slowmode account_age].freeze
+
+    TAB_KINDS = {
+      "bots" => ChannelGuard::BOT_ALLOWLIST,
+      "readonly" => ChannelGuard::READONLY,
+      "slowmode" => ChannelGuard::SLOWMODE,
+      "account_age" => ChannelGuard::ACCOUNT_AGE
+    }.freeze
+
     def show
       @channel_id = params[:channel_id].to_s.strip.upcase
+      @tab = params[:tab].presence_in(TABS) || TABS.first
       @channel = Analytics::DimChannel.find_by(channel_id: @channel_id)
-      @guard = ChannelGuard.live_for(@channel_id)
-      @allows = @guard ? @guard.allows.oldest_first.to_a : []
+      @guards = ChannelGuard.live_by_kind(@channel_id)
+      @guard = @guards[ChannelGuard::BOT_ALLOWLIST]
+      @kind = TAB_KINDS[@tab]
+      @kind_guard = @kind ? @guards[@kind] : nil
+      @allows = @kind_guard&.takes_allows? ? @kind_guard.allows.oldest_first.to_a : []
       @standing = ChannelJoin.latest_for(@channel_id)
       @seat = ChannelMembership.inside?(@channel_id)
-      @events = ChannelGuardEvent.where(channel_id: @channel_id)
-        .newest_first.limit(ACTIVITY_SHOWN).to_a
+      @events = @kind ? ChannelGuardEvent.for_kind(@channel_id, @kind)
+        .newest_first.limit(ACTIVITY_SHOWN).to_a : []
       @labels = labels_for(@events)
       @app_ids = app_ids_for(@allows)
-      @names = Names.for([(@guard ? @guard.people_named : []),
+      @names = Names.for([@guards.values.flat_map(&:people_named),
                           @allows.map(&:subject_id), @events.map(&:subject_id)])
       load_pane
     end

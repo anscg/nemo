@@ -12,89 +12,39 @@
   <%= render "pane", query: @query, rows: @rows, open_id: @open_id %>
 <% end %>
 
-<div class="card card-flush">
-  <div class="card-head">
-    <h2 class="card-title">Bot allow list</h2>
-    <div class="card-tools">
-      <% if @guard %>
-        <%= opens_modal "channel.guard", "Allow a bot", opens: "allow-bot",
-              css: "btn btn-sm" %>
-      <% end %>
-      <%= channel_guard_switch(@channel_id, @guard) %>
-    </div>
-  </div>
-
-  <% if @guard %>
-    <% if @allows.any? %>
-      <div class="people-list">
-        <% @allows.each do |one| %>
-          <div class="line-row fat">
-            <%= guard_face(one.subject_id) %>
-            <span class="grow two-line">
-              <b><%= bot_name_link(one.name, @app_ids[one.subject_id]) %></b>
-              <span>
-                <span class="mono"><%= one.subject_id %></span>
-                &middot; <%= vouched_line(one) %>
-              </span>
-            </span>
-            <span class="row-right">
-              <%= gated_button("channel.guard", "Remove",
-                    fd_channel_allow_path(@channel_id, one.subject_id),
-                    css: "btn btn-sm btn-ghost", method: :delete,
-                    data: { turbo_confirm: "Put #{one.name} out of #{label}?" }) %>
-            </span>
-          </div>
-        <% end %>
-      </div>
-    <% else %>
-      <div class="empty">
-        <p class="empty-title">No bot allowed yet</p>
-      </div>
-    <% end %>
-  <% else %>
-    <div class="empty">
-      <p class="empty-title">Not guarded</p>
-    </div>
+<% content_for :page_tabs do %>
+  <% Fd::ChannelsController::TABS.each do |key| %>
+    <%= link_to channel_tab_label(key), fd_channel_path(@channel_id, tab: key),
+          class: "view", aria: { current: ("true" if key == @tab) } %>
   <% end %>
-</div>
+<% end %>
 
-<div class="card card-flush">
-  <div class="card-head">
-    <h2 class="card-title">Activity</h2>
-  </div>
+<% if @tab == "overview" %>
+  <%= render "overview", channel_id: @channel_id, guards: @guards %>
+<% end %>
 
-  <% if @events.any? %>
-    <div class="activity">
-      <% @events.each do |one| %>
-        <div class="activity-item">
-          <div class="line-row">
-            <%= guard_face(one.subject_id) %>
-            <span class="grow two-line">
-              <b><%= bot_name_link(activity_who(one, @labels), one.app_id) %></b>
-              <span><%= activity_ids(one) %></span>
-            </span>
-            <span class="row-right">
-              <span class="sub2 mono"><%= at_minute(one.at) %></span>
-            </span>
-          </div>
+<% if @tab == "bots" %>
+  <%= render "bots", channel_id: @channel_id, label: label,
+        guard: @kind_guard, allows: @allows %>
+  <%= render "activity", events: @events, labels: @labels %>
+<% end %>
 
-          <span class="activity-what"><%= activity_verb(one) %></span>
+<% if @tab == "readonly" %>
+  <%= render "readonly", channel_id: @channel_id, guard: @kind_guard, allows: @allows %>
+  <%= render "activity", events: @events, labels: @labels %>
+<% end %>
 
-          <% if one.said.present? %>
-            <span class="qcite">
-              <span class="qcite-said"><%= plain_words(one.said) %></span>
-            </span>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
-  <% else %>
-    <div class="empty">
-      <p class="empty-title">Nothing yet</p>
-    </div>
-  <% end %>
-</div>
+<% if @tab == "slowmode" %>
+  <%= render "slowmode", channel_id: @channel_id, guard: @kind_guard, allows: @allows %>
+  <%= render "activity", events: @events, labels: @labels %>
+<% end %>
 
-<% if @guard %>
-  <%= render "allow_modal", channel_id: @channel_id, label: label %>
+<% if @tab == "account_age" %>
+  <%= render "account_age", channel_id: @channel_id, guard: @kind_guard %>
+  <%= render "activity", events: @events, labels: @labels %>
+<% end %>
+
+<% if @kind_guard&.takes_allows? %>
+  <%= render "allow_modal", channel_id: @channel_id, label: label,
+        kind: @kind_guard.kind %>
 <% end %>

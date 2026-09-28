@@ -41,7 +41,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
   end
 
   test "turning the guard on records who did it" do
-    post fd_channel_guard_path(@channel.channel_id)
+    post fd_channel_guard_path(@channel.channel_id, "bot_allowlist")
 
     guard = Fd::ChannelGuard.live_for(@channel.channel_id)
     assert_not_nil guard
@@ -54,7 +54,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
     guard!
 
     assert_no_difference -> { Fd::ChannelGuard.count } do
-      post fd_channel_guard_path(@channel.channel_id)
+      post fd_channel_guard_path(@channel.channel_id, "bot_allowlist")
     end
   end
 
@@ -62,7 +62,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
     guard = guard!
     guard.allows.create!(subject_id: "B0CACHET", added_by: "UME")
 
-    delete fd_channel_guard_path(@channel.channel_id)
+    delete fd_channel_guard_path(@channel.channel_id, "bot_allowlist")
 
     assert_nil Fd::ChannelGuard.live_for(@channel.channel_id)
     assert_equal "lifted", guard.reload.state
@@ -72,7 +72,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
   end
 
   test "lifting a channel nobody guards changes nothing" do
-    delete fd_channel_guard_path(@channel.channel_id)
+    delete fd_channel_guard_path(@channel.channel_id, "bot_allowlist")
 
     assert_equal 0, Fd::ChannelGuard.where(channel_id: @channel.channel_id).count
   end
@@ -80,7 +80,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
   test "allowing a bot records who vouched for it" do
     guard = guard!
 
-    post fd_channel_allows_path(@channel.channel_id),
+    post fd_channel_allows_path(@channel.channel_id, "bot_allowlist"),
       params: { subject_ids: ["B0CACHET"] }
 
     allow = guard.allows.find_by(subject_id: "B0CACHET")
@@ -93,7 +93,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
   test "allowing the same bot twice leaves one row" do
     guard = guard!
     2.times do
-      post fd_channel_allows_path(@channel.channel_id), params: { subject_ids: ["B0CACHET"] }
+      post fd_channel_allows_path(@channel.channel_id, "bot_allowlist"), params: { subject_ids: ["B0CACHET"] }
     end
 
     assert_equal 1, guard.allows.where(subject_id: "B0CACHET").count
@@ -102,13 +102,13 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
   test "an id that is not a member id is refused" do
     guard = guard!
 
-    post fd_channel_allows_path(@channel.channel_id), params: { subject_ids: ["not-an-id"] }
+    post fd_channel_allows_path(@channel.channel_id, "bot_allowlist"), params: { subject_ids: ["not-an-id"] }
 
     assert_equal 0, guard.allows.count
   end
 
   test "nothing can be allowed on a channel nobody guards" do
-    post fd_channel_allows_path(@channel.channel_id), params: { subject_ids: ["B0CACHET"] }
+    post fd_channel_allows_path(@channel.channel_id, "bot_allowlist"), params: { subject_ids: ["B0CACHET"] }
 
     assert_equal 0, Fd::ChannelGuardAllow.count
   end
@@ -117,7 +117,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
     guard = guard!
     guard.allows.create!(subject_id: "B0CACHET", label: "Cachet", added_by: "UME")
 
-    delete fd_channel_allow_path(@channel.channel_id, "B0CACHET")
+    delete fd_channel_allow_path(@channel.channel_id, "bot_allowlist", "B0CACHET")
 
     assert_equal 0, guard.allows.count
     assert Fd::AuditEntry.where(entity_type: "channel_allow", entity_id: guard.id,
@@ -136,7 +136,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
     guard = guard!
     guard.events.create!(channel_id: @channel.channel_id, subject_id: "B0ZAPIER", verb: "kicked")
 
-    delete fd_channel_guard_path(@channel.channel_id)
+    delete fd_channel_guard_path(@channel.channel_id, "bot_allowlist")
     get fd_channel_path(@channel.channel_id)
 
     assert_response :success
@@ -148,7 +148,7 @@ class FdChannelsTest < ActionDispatch::IntegrationTest
     move_capability!("firefighter", "channel.guard", false, by: "UME")
     sign_in_as(them)
 
-    post fd_channel_guard_path(@channel.channel_id)
+    post fd_channel_guard_path(@channel.channel_id, "bot_allowlist")
 
     assert_nil Fd::ChannelGuard.live_for(@channel.channel_id)
   end

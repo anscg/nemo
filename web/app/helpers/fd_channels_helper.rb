@@ -5,15 +5,45 @@ module FdChannelsHelper
     guard.live? ? "guarding" : "lifted"
   end
 
-  def channel_guard_switch(channel_id, guard)
+  GUARD_LABELS = {
+    Fd::ChannelGuard::BOT_ALLOWLIST => "Bot allow list",
+    Fd::ChannelGuard::READONLY => "Read-only",
+    Fd::ChannelGuard::SLOWMODE => "Slow mode",
+    Fd::ChannelGuard::ACCOUNT_AGE => "New accounts"
+  }.freeze
+
+  CHANNEL_TAB_LABELS = {
+    "overview" => "Overview",
+    "bots" => "Bots",
+    "readonly" => "Read-only",
+    "slowmode" => "Slow mode",
+    "account_age" => "New accounts"
+  }.freeze
+
+  def channel_tab_label(key)
+    CHANNEL_TAB_LABELS.fetch(key) { key.tr("_", " ").capitalize }
+  end
+
+  def guard_label(kind)
+    GUARD_LABELS.fetch(kind, kind)
+  end
+
+  def channel_guard_switch(channel_id, guard, kind: Fd::ChannelGuard::BOT_ALLOWLIST)
     on = guard.present?
     return nil unless current_account.may?("channel.guard")
 
-    button_to on ? "yes" : "no", fd_channel_guard_path(channel_id),
+    button_to on ? "yes" : "no", fd_channel_guard_path(channel_id, kind),
       method: on ? :delete : :post, class: "switch #{on ? 'yes' : 'no'}",
-      title: on ? "stop guarding this channel" : "guard this channel",
-      aria: { label: on ? "stop guarding this channel" : "guard this channel" },
+      title: on ? "turn it off" : "turn it on",
+      aria: { label: on ? "turn it off" : "turn it on" },
       form: { class: "contents" }
+  end
+
+  def slowmode_line(guard)
+    return nil if guard.nil?
+
+    said = "#{pluralize(guard.seconds, 'second')} between messages"
+    guard.threads? ? "#{said}, threads too" : said
   end
 
   def channel_guard_why(guard)
@@ -51,16 +81,14 @@ module FdChannelsHelper
   MARKETPLACE = "https://hackclub.slack.com/marketplace".freeze
 
   ACTIVITY_SAID = {
-    "kicked" => "put out",
-    "deleted" => "message deleted",
-    "let_past" => "stayed, we could not put it out"
+    "kicked" => ["removed", "state-warn"],
+    "deleted" => ["deleted", "state-warn"],
+    "let_past" => ["not removed", "state-crit"]
   }.freeze
 
   def activity_verb(event)
-    said = ACTIVITY_SAID.fetch(event.verb, event.verb)
-    return tag.span(said, class: "sev-crit") if event.verb == Fd::ChannelGuardEvent::LET_PAST
-
-    tag.span(said)
+    said, tone = ACTIVITY_SAID.fetch(event.verb, [event.verb, "state-off"])
+    tag.span(said, class: "state #{tone}")
   end
 
   def activity_who(event, labels)

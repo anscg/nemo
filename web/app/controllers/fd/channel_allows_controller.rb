@@ -9,9 +9,9 @@ module Fd
       return refuse("this channel is not guarded") if guard.nil?
 
       wanted = asked_for
-      return refuse("say which bot to allow") if wanted.empty?
+      return refuse("say who to allow") if wanted.empty?
       unless wanted.all? { |id| id.match?(MEMBER_ID) }
-        return refuse("that does not look like a bot id")
+        return refuse("that does not look like a member id")
       end
 
       added = []
@@ -26,7 +26,7 @@ module Fd
         end
       end
 
-      redirect_to fd_channel_path(channel_id), notice: allowed_notice(added, wanted)
+      redirect_to fd_channel_path(channel_id, tab: kind), notice: allowed_notice(added, wanted)
     end
 
     def destroy
@@ -42,8 +42,8 @@ module Fd
         allow.destroy!
       end
 
-      redirect_to fd_channel_path(channel_id),
-        notice: "#{allow.name} is off the list, and will be put out if it posts"
+      redirect_to fd_channel_path(channel_id, tab: kind),
+        notice: "#{allow.name} is off the list"
     end
 
     private
@@ -52,8 +52,12 @@ module Fd
       @channel_id ||= params[:channel_id].to_s.strip.upcase
     end
 
+    def kind
+      @kind ||= params[:kind].to_s
+    end
+
     def live_guard
-      @live_guard ||= ChannelGuard.live_for(channel_id)
+      @live_guard ||= ChannelGuard.live_for(channel_id, kind: kind)
     end
 
     def asked_for
@@ -74,7 +78,7 @@ module Fd
     end
 
     def refuse(why)
-      redirect_to fd_channel_path(channel_id), alert: why
+      redirect_to fd_channel_path(channel_id, tab: kind), alert: why
     end
   end
 end
