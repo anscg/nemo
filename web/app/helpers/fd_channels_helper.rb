@@ -129,17 +129,9 @@ module FdChannelsHelper
     Fd::AppSetting::OFF => "None"
   }.freeze
 
-  def join_mode_switch(mode)
-    unless current_account.may?("channel.guard")
-      return tag.div(class: "segmented") { join_mode_options(mode) { |key, label, here|
-        tag.span(label, "aria-pressed": here)
-      } }
-    end
-
-    form_with(url: fd_channel_join_mode_path, method: :post, class: "segmented") do
-      join_mode_options(mode) do |key, label, here|
-        button_tag(label, name: "mode", value: key, "aria-pressed": here)
-      end
+  def join_mode_said(mode)
+    tag.div(class: "segmented") do
+      join_mode_options(mode) { |_key, label, here| tag.span(label, "aria-pressed": here) }
     end
   end
 

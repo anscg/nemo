@@ -103,4 +103,18 @@ module AdminHelper
       tag.span(tag.i(nil, style: "width: #{width}%")) + tag.span(count)
     end
   end
+
+  JOIN_MODES = {
+    Fd::AppSetting::ON => "All public",
+    Fd::AppSetting::GUARDED => "Guarded only",
+    Fd::AppSetting::OFF => "None"
+  }.freeze
+
+  def admin_join_mode_switch(mode)
+    form_with(url: admin_settings_join_mode_path, method: :post, class: "segmented") do
+      safe_join(JOIN_MODES.map { |key, label|
+        button_tag(label, name: "mode", value: key, "aria-pressed": (key == mode).to_s)
+      })
+    end
+  end
 end

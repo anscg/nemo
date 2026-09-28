@@ -1,14 +1,30 @@
 import logging
 
 from bot.core import session
-from bot.nemo import channel, memberguards
+from bot.nemo import channel, channels, memberguards
 from bot.nemo.carriers import CARRIERS
 
 log = logging.getLogger("bot.nemo")
 
 LAPSED_BECAUSE = "the date it ran until has passed"
 
-SOON = "36 hours"
+SOON_HOURS = 36
+SOONEST = 720
+
+
+def soon(conn):
+    said = channels.setting(conn, channels.SWEEP_SOON_HOURS)
+    try:
+        hours = int(said)
+    except ValueError:
+        hours = 0
+    if not 1 <= hours <= SOONEST:
+        hours = SOON_HOURS
+    return f"{hours} hours"
+
+
+def tells_member(conn):
+    return channels.setting(conn, channels.SWEEP_TELLS_MEMBER) != "off"
 
 HEADING = "*Ending soon*"
 LINE = "• <@{who}> — {what}{where}, until {when}{case}"
@@ -25,7 +41,7 @@ def lapse(client, conn, guard):
     memberguards.happened(conn, guard["id"], guard["subject_id"], guard["channel_id"],
                           "released", detail=LAPSED_BECAUSE)
     carrier = carrier_for(guard)
-    if carrier is not None:
+    if carrier is not None and tells_member(conn):
         carrier.let_go(client, conn, guard)
 
     log.info("nemo: %s %s on %s has run out and is lifted",
@@ -78,16 +94,16 @@ def nudge(client, guards, room):
 
 def sweep_ending(client):
     with session() as conn:
-        soon = memberguards.ending_untold(conn, SOON)
+        ending = memberguards.ending_untold(conn, soon(conn))
         room = channel.firehouse_channel(conn)
 
-    if not soon or not room:
+    if not ending or not room:
         return 0
 
-    nudge(client, soon, room)
+    nudge(client, ending, room)
     with session() as conn:
-        for guard in soon:
+        for guard in ending:
             memberguards.happened(conn, guard["id"], guard["subject_id"], None,
                                   "told", detail=memberguards.ENDING)
-    log.info("nemo: said that %s guard(s) are ending soon", len(soon))
-    return len(soon)
+    log.info("nemo: said that %s guard(s) are ending soon", len(ending))
+    return len(ending)

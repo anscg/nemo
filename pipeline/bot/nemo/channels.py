@@ -15,6 +15,8 @@ MODES = (ON, GUARDED, OFF)
 SETTING = "nemo.join_mode"
 FIREHOUSE = "nemo.firehouse_channel"
 REACT_CHANNELS = "nemo.case_react_channels"
+SWEEP_SOON_HOURS = "nemo.sweep_soon_hours"
+SWEEP_TELLS_MEMBER = "nemo.sweep_tells_member"
 FALL_BACK = GUARDED
 
 PAGE = 1000

@@ -15,6 +15,12 @@ module Fd
     UNSUB_SHIELD_ON = "nemo.unsub_shield_on".freeze
     UNSUB_SHIELD_LINK = "nemo.unsub_shield_link".freeze
 
+    SWEEP_SOON_HOURS = "nemo.sweep_soon_hours".freeze
+    SWEEP_TELLS_MEMBER = "nemo.sweep_tells_member".freeze
+
+    SOON_FALL_BACK = 36
+    SOONEST = 720
+
     COOLDOWN_FALL_BACK = 7
 
     ON = "on".freeze
@@ -79,6 +85,15 @@ module Fd
     end
 
     def self.autoresponse_emoji = words(AUTORESPONSE_EMOJI)
+
+    def self.sweep_soon_hours
+      held = said(SWEEP_SOON_HOURS).to_i
+      held.positive? ? held : SOON_FALL_BACK
+    end
+
+    def self.sweep_tells_member?
+      said(SWEEP_TELLS_MEMBER) != OFF
+    end
 
     def self.autoresponse_cooldown_days
       held = said(AUTORESPONSE_COOLDOWN).to_i

@@ -23,7 +23,6 @@ Rails.application.routes.draw do
     get "members/pane", to: "members#pane", as: :member_pane
     get "channels/pane", to: "channels#pane", as: :channel_pane
     get "channels/search", to: "channels#search", as: :channel_search
-    post "channels/join_mode", to: "join_mode#update", as: :channel_join_mode
     post "channels/:channel_id/guards/:kind", to: "channel_guards#create", as: :channel_guard
     patch "channels/:channel_id/guards/:kind", to: "channel_guards#update"
     delete "channels/:channel_id/guards/:kind", to: "channel_guards#destroy"
@@ -95,6 +94,8 @@ Rails.application.routes.draw do
     resource :flags, only: [:show], controller: "flags"
     resource :settings, only: [:show], controller: "settings"
     post "settings/firehouse", to: "settings#firehouse", as: :settings_firehouse
+    post "settings/join_mode", to: "settings#join_mode", as: :settings_join_mode
+    post "settings/sweep", to: "settings#sweep", as: :settings_sweep
     post "settings/react_channels", to: "settings#add_react", as: :settings_react_channels
     delete "settings/react_channels/:channel_id", to: "settings#drop_react",
            as: :settings_react_channel

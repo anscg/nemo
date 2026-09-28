@@ -12,8 +12,9 @@ ENDS = dt.datetime(2026, 3, 10, 12, tzinfo=dt.UTC)
 
 
 class Conn:
-    def __init__(self, lifts=True):
+    def __init__(self, lifts=True, settings=None):
         self.lifts = lifts
+        self.settings = settings or {}
         self.ran = []
 
     def execute(self, sql, args=None):
@@ -21,8 +22,12 @@ class Conn:
         return self
 
     def fetchone(self):
-        if "SET state = 'lifted'" in self.ran[-1][0]:
+        sql, args = self.ran[-1]
+        if "SET state = 'lifted'" in sql:
             return (7,) if self.lifts else None
+        if "FROM fd.app_settings" in sql:
+            held = self.settings.get(args[0])
+            return (held,) if held is not None else None
         return (1,)
 
     def fetchall(self):
@@ -174,3 +179,33 @@ def test_every_carrier_can_be_let_go(carrier):
     conn, client = Conn(), Slack()
     carrier.let_go(client, conn, guard(kind=carrier.KIND, channel_id=ROOM))
     assert client.posted, f"{carrier.KIND} says nothing when it ends"
+
+
+def test_the_ending_horizon_falls_back_when_it_is_not_set():
+    assert sweep.soon(Conn()) == "36 hours"
+
+
+def test_the_ending_horizon_is_read_from_the_setting():
+    assert sweep.soon(Conn(settings={"nemo.sweep_soon_hours": "12"})) == "12 hours"
+
+
+def test_an_horizon_outside_the_range_falls_back():
+    assert sweep.soon(Conn(settings={"nemo.sweep_soon_hours": "0"})) == "36 hours"
+    assert sweep.soon(Conn(settings={"nemo.sweep_soon_hours": "9999"})) == "36 hours"
+    assert sweep.soon(Conn(settings={"nemo.sweep_soon_hours": "sideways"})) == "36 hours"
+
+
+def test_the_member_is_told_unless_it_is_turned_off():
+    assert sweep.tells_member(Conn()) is True
+    assert sweep.tells_member(Conn(settings={"nemo.sweep_tells_member": "on"})) is True
+    assert sweep.tells_member(Conn(settings={"nemo.sweep_tells_member": "off"})) is False
+
+
+def test_a_lapse_says_nothing_when_telling_is_off():
+    conn = Conn(settings={"nemo.sweep_tells_member": "off"})
+    client = Slack()
+    sweep.lapse(client, conn, guard())
+
+    assert client.posted == []
+    assert "released" in conn.verbs()
+
