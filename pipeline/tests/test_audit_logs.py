@@ -215,6 +215,18 @@ def test_the_backfill_walks_the_channel_actions_as_well_as_the_logins():
     assert len(said) <= pull.MOST_ACTIONS, "slack takes only so many actions in one call"
 
 
+def test_the_access_log_walk_stops_at_what_we_already_hold():
+    from ingest import access_logs_pull
+
+    said = pathlib.Path(access_logs_pull.__file__).read_text()
+    assert "newest_held(conn)" in said
+    assert "caught_up = True" in said and "break" in said, \
+        "slack hands the access log back newest first, so the walk stops at the watermark"
+    assert "walk.close()" in said, "the generator is closed so no further page is asked for"
+    assert access_logs_pull.LAP_SECONDS >= 1
+    assert access_logs_pull.MOST_PAGES >= 1, "a cold start must still be bounded"
+
+
 def test_the_tail_laps_back_a_second_so_the_seam_cannot_drop_an_event():
     assert pull.LAP_SECONDS >= 1
 

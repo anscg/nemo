@@ -29,6 +29,7 @@ LIMITS = {
     ("nemo", "admin", "scim.users.deactivate"): (TIER2, 0),
     ("nemo", "admin", "scim.users.activate"): (TIER2, 0),
     ("nemo", "admin", "chat.delete"): (TIER3, 60, 30),
+    ("nemo", "admin", "users.info"): (TIER4, 0),
     ("nemo", "admin"): (TIER3, 60),
     ("pipeline", "admin"): (TIER4, 500),
     ("pipeline", "internal"): (TIER3, 100),

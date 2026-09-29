@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from lib import useragent
 from lib.db import dead_letter, ingest_run
@@ -8,6 +8,12 @@ SOURCE = "access_logs"
 METHOD = "team.accessLogs"
 CREDENTIAL = "admin"
 PAGE = 1000
+LAP_SECONDS = 120
+MOST_PAGES = 20
+
+NEWEST_SQL = """
+SELECT at FROM fd.login_event WHERE source = 'access_logs' ORDER BY at DESC LIMIT 1
+"""
 
 ROW_SQL = """
 INSERT INTO fd.login_event
@@ -77,10 +83,19 @@ def land(conn, logins, counts):
     return len(rows)
 
 
+def newest_held(conn):
+    row = conn.execute(NEWEST_SQL).fetchone()
+    return row[0] if row else None
+
+
 def run(conn, client=None):
     client = client or ProxyClient.for_source(SOURCE)
+    since = newest_held(conn)
+    stop_at = since - timedelta(seconds=LAP_SECONDS) if since else None
+
     held = []
     landed = 0
+    caught_up = False
 
     with ingest_run(conn, SOURCE) as counts:
         def flush():
@@ -90,13 +105,24 @@ def run(conn, client=None):
             landed += land(conn, held, counts)
             held.clear()
 
-        held.extend(client.paginate(
+        walk = client.paginate(
             METHOD, {}, "logins", page_size=PAGE, cursor_param="cursor",
             credential=CREDENTIAL, page_param="limit",
             cursor_field="response_metadata.next_cursor",
-            on_page=lambda _cursor, _seen: flush(),
-        ))
+        )
+        for login in walk:
+            when = stamp(login.get("date_last") or login.get("date_first"))
+            if stop_at is not None and when is not None and when < stop_at:
+                caught_up = True
+                break
+            held.append(login)
+            if len(held) >= PAGE * MOST_PAGES:
+                break
+            if len(held) % PAGE == 0:
+                flush()
+        walk.close()
         flush()
 
-    print(f"{SOURCE}: {landed} login row(s)")
+    said = "up to date" if caught_up else "more to walk"
+    print(f"{SOURCE}: {landed} login row(s), {said}")
     return landed

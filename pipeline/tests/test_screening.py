@@ -215,6 +215,37 @@ def test_a_domain_the_web_adds_reaches_the_bot_without_waiting_for_a_sweep():
     assert "elif channel_name == BLOCKED_DOMAIN:" in watched
 
 
+def test_the_join_watcher_asks_slack_for_the_address_the_event_leaves_out():
+    import pathlib
+
+    from bot.nemo.surface import join_watch
+
+    said = pathlib.Path(join_watch.__file__).read_text()
+    assert "privileged.profile(" in said, \
+        "team_join carries no email, so the profile has to be fetched"
+    assert "joiners.keep(conn, whole_user)" in said, "what slack hands back is kept"
+
+
+def test_the_profile_is_read_on_the_admin_credential():
+    import pathlib
+
+    from bot.core import privileged
+
+    assert privileged.PROFILE == "users.info"
+    source = pathlib.Path(privileged.__file__).read_text()
+    asked = source.split("def profile(")[1].split("def ")[0]
+    assert 'credential="admin"' in asked, \
+        "the bot token holds users:read, only the admin token holds users:read.email"
+
+
+def test_a_profile_slack_will_not_hand_over_does_not_stop_the_join(monkeypatch):
+    from bot.core import privileged
+
+    monkeypatch.setattr(privileged, "proxy", lambda: (_ for _ in ()).throw(RuntimeError("no")))
+    assert privileged.profile("U1") is None
+    assert privileged.profile(None) is None
+
+
 def test_the_join_watcher_screens_only_somebody_who_is_new():
     import pathlib
 

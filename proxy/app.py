@@ -70,6 +70,7 @@ WRITE_METHODS = {
             "chat.delete",
             "conversations.kick",
             "admin.users.session.reset",
+            "users.info",
         }
         | set(SCIM_METHODS)
     ),

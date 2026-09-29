@@ -1,6 +1,6 @@
 import logging
 
-from bot.core import session
+from bot.core import privileged, session
 from bot.nemo import joiners, screening
 from bot.nemo.surface import on_event
 
@@ -20,8 +20,11 @@ def arrived(ctx):
     if not fresh:
         return user["id"]
 
-    email = ((user.get("profile") or {}).get("email"))
+    whole_user = privileged.profile(user["id"]) or user
+    email = ((whole_user.get("profile") or {}).get("email"))
     with session() as conn:
+        if whole_user is not user:
+            joiners.keep(conn, whole_user)
         screening.screen(conn, user["id"], email, client=ctx.client)
     return user["id"]
 

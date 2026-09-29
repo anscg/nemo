@@ -135,6 +135,23 @@ def carried(user_id, method, done, doing):
     return done
 
 
+PROFILE = "users.info"
+
+
+def profile(user_id):
+    if not user_id:
+        return None
+
+    try:
+        found = proxy().call(PROFILE, {"user": user_id},
+                             credential="admin", max_retries=1)
+    except Exception as failure:  # noqa: BLE001
+        log.warning("privileged: could not read the profile of %s: %s", user_id, failure)
+        return None
+
+    return (found or {}).get("user")
+
+
 def deactivate(user_id):
     return carried(user_id, DEACTIVATE, DEACTIVATED, "deactivate")
 
