@@ -22,6 +22,7 @@ WANTED = ("latest", "oldest", "limit", "action", "actor", "entity", "cursor")
 MOST = 9999
 
 AUTH_CODES = (401, 403)
+REFUSAL_CODES = (400,)
 
 
 class AuditAuthError(RuntimeError):
@@ -94,4 +95,6 @@ def call(method, params=None):
         said = (failure.read() or b"").decode("utf-8", "replace")[:500]
         if failure.code in AUTH_CODES:
             raise AuditAuthError(f"audit {failure.code}: {said}") from failure
+        if failure.code in REFUSAL_CODES:
+            raise AuditApiError(f"audit {failure.code}: {said or 'refused'}") from failure
         raise

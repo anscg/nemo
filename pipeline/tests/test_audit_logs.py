@@ -5,6 +5,7 @@ import pytest
 
 from ingest import audit_logs_pull as pull
 from lib import useragent
+from lib.proxy_client import ProxyError
 
 WHO = "U1"
 APP = "A0BJDDB42N7"
@@ -110,6 +111,81 @@ def test_the_tail_asks_for_everything_unless_it_is_told_to_narrow(monkeypatch):
 def test_no_more_actions_are_asked_for_than_slack_will_take(monkeypatch):
     monkeypatch.setenv("AUDIT_TAIL_ACTIONS", ",".join(f"a{n}" for n in range(60)))
     assert len(pull.tail_actions()) == pull.MOST_ACTIONS
+
+
+class Refusing:
+    """a proxy that will not take one action, the way slack will not take message_deleted"""
+
+    def __init__(self, bad="message_deleted"):
+        self.bad = bad
+        self.asked = []
+
+    def call(self, _method, params, **_over):
+        self.asked.append(params.get("action"))
+        if self.bad in str(params.get("action", "")).split(","):
+            raise refusal()
+        return {"entries": [], "response_metadata": {"next_cursor": ""}}
+
+    def paginate(self, _method, params, _key, **_over):
+        self.asked.append(params.get("action"))
+        if self.bad in str(params.get("action", "")).split(","):
+            raise refusal()
+        return iter(())
+
+
+def refusal():
+    failure = ProxyError("proxy returned 400: audit 400: Bad Request")
+    failure.http_status = 400
+    return failure
+
+
+def test_one_action_slack_will_not_take_does_not_stop_the_rest(monkeypatch):
+    pull.forget_refusals()
+    client = Refusing()
+    counts = Counts()
+
+    landed, seated = pull.walk(client, Conn(), "k", counts,
+                               actions=("user_login", "message_deleted", "anomaly"))
+
+    assert (landed, seated) == (0, 0)
+    assert "message_deleted" in pull.refused_actions()
+    assert "user_login" not in pull.refused_actions()
+    assert client.asked[-1] == "user_login,anomaly", "it walks again without the refused one"
+    pull.forget_refusals()
+
+
+def test_an_action_once_refused_is_not_asked_for_again(monkeypatch):
+    pull.forget_refusals()
+    client = Refusing()
+    pull.walk(client, Conn(), "k", counts_for(), actions=("user_login", "message_deleted"))
+
+    client.asked.clear()
+    pull.walk(client, Conn(), "k", counts_for(), actions=("user_login", "message_deleted"))
+    assert all("message_deleted" not in str(one) for one in client.asked)
+    pull.forget_refusals()
+
+
+def test_a_pass_where_every_action_is_refused_lands_nothing_rather_than_everything():
+    pull.forget_refusals()
+    client = Refusing(bad="user_login")
+    assert pull.walk(client, Conn(), "k", counts_for(), actions=("user_login",)) == (0, 0)
+    assert pull.walk(client, Conn(), "k", counts_for(), actions=("user_login",)) == (0, 0)
+    pull.forget_refusals()
+
+
+def test_a_refusal_with_no_action_filter_is_not_swallowed():
+    pull.forget_refusals()
+
+    class Always:
+        def paginate(self, *_args, **_over):
+            raise refusal()
+
+    with pytest.raises(ProxyError):
+        pull.walk(Always(), Conn(), "k", counts_for())
+
+
+def counts_for():
+    return Counts()
 
 
 def test_a_slice_covers_one_whole_day_in_utc():

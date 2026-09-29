@@ -1,11 +1,12 @@
 import os
+import threading
 from datetime import UTC, date, datetime, timedelta
 
 from psycopg.types.json import Jsonb
 
 from lib import coverage, useragent
 from lib.db import dead_letter, get_cursor, ingest_run, save_cursor
-from lib.proxy_client import ProxyClient
+from lib.proxy_client import ProxyClient, ProxyError
 
 METHOD = "audit.logs"
 CREDENTIAL = "admin"
@@ -65,6 +66,55 @@ def horizon_days():
 
 
 MOST_ACTIONS = 30
+REFUSED = 400
+
+_refused = set()
+_refusals = threading.Lock()
+
+
+def refused_actions():
+    with _refusals:
+        return frozenset(_refused)
+
+
+def forget_refusals():
+    with _refusals:
+        _refused.clear()
+
+
+def turned_down(failure):
+    return getattr(failure, "http_status", None) == REFUSED
+
+
+def usable(actions):
+    if not actions:
+        return actions
+
+    held = refused_actions()
+    return tuple(one for one in actions if one not in held)
+
+
+def find_refusals(client, actions):
+    """Slack lists actions it will not take, so ask about each one alone and remember."""
+    found = []
+    for one in actions:
+        try:
+            client.call(METHOD, {"limit": 1, "action": one},
+                        credential=CREDENTIAL, max_retries=0)
+        except ProxyError as failure:
+            if not turned_down(failure):
+                raise
+            found.append(one)
+
+    if found:
+        with _refusals:
+            _refused.update(found)
+        log_refusals(found)
+    return found
+
+
+def log_refusals(found):
+    print(f"{TAIL}: slack will not take {', '.join(sorted(found))}, leaving them out")
 
 
 def tail_actions():
@@ -164,8 +214,11 @@ def walk(client, conn, source_key, counts, oldest=None, latest=None, actions=Non
         asked["oldest"] = int(oldest.timestamp())
     if latest is not None:
         asked["latest"] = int(latest.timestamp())
-    if actions:
-        asked["action"] = ",".join(actions[:MOST_ACTIONS])
+    held = usable(actions)
+    if actions and not held:
+        return 0, 0
+    if held:
+        asked["action"] = ",".join(held[:MOST_ACTIONS])
 
     ours = nemo_ids()
     held = []
@@ -185,15 +238,31 @@ def walk(client, conn, source_key, counts, oldest=None, latest=None, actions=Non
         if on_cursor:
             on_cursor(cursor)
 
-    held.extend(client.paginate(
-        METHOD, asked, "entries", page_size=PAGE, cursor_param="cursor",
-        credential=CREDENTIAL, page_param="limit",
-        cursor_field="response_metadata.next_cursor",
-        start_cursor=start_cursor, on_page=page_done, allow_empty_pages=True,
-    ))
+    def pages():
+        return client.paginate(
+            METHOD, asked, "entries", page_size=PAGE, cursor_param="cursor",
+            credential=CREDENTIAL, page_param="limit",
+            cursor_field="response_metadata.next_cursor",
+            start_cursor=start_cursor, on_page=page_done, allow_empty_pages=True,
+        )
+
+    try:
+        held.extend(pages())
+    except ProxyError as failure:
+        if not turned_down(failure) or not held_actions(asked):
+            raise
+        if not find_refusals(client, held_actions(asked)):
+            raise
+        return walk(client, conn, source_key, counts, oldest=oldest, latest=latest,
+                    actions=actions, start_cursor=start_cursor, on_cursor=on_cursor)
 
     flush()
     return landed, seated
+
+
+def held_actions(asked):
+    said = asked.get("action")
+    return tuple(said.split(",")) if said else ()
 
 
 def watermark(conn):
