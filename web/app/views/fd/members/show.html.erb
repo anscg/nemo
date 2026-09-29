@@ -5,6 +5,7 @@
 <% may_guard = current_account.may?("member.guard") %>
 <% may_deactivate = current_account.may?("member.deactivate") %>
 <% may_identity = current_account.may?("identity.read") %>
+<% may_links = current_account.may?("member.links") %>
 <% standing_guard = @guards.find(&:deactivation?) %>
 
 <% content_for :page_title, (names.unknown?(@user_id) ? person_name(@user_id) : member_handle) %>
@@ -31,6 +32,8 @@
         label: "More actions", trigger: menu_dots } do %>
     <%= opens_modal "identity.read", menu_item("sessions", "Sessions"),
           opens: "member-sessions" %>
+    <%= opens_modal "member.links", menu_item("people", "Linked accounts"),
+          opens: "member-links" %>
     <% if standing_guard %>
       <%= opens_modal "member.deactivate", menu_item("hand", "Activate"),
             opens: "guard-lift-#{standing_guard.id}" %>
@@ -181,6 +184,18 @@
       <%= turbo_frame_tag Fd::MemberSessions.frame(@user_id), target: "_top",
             src: fd_member_logins_path(@user_id), loading: "lazy" do %>
         <p class="card-note">Reading the sign-ins…</p>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if may_links %>
+  <%= render layout: "fd/modal", locals: { id: "member-links", title: "Linked accounts",
+        sub: names[@user_id], size: "wide", open: params[:do] == "links" } do %>
+    <div class="modal-body">
+      <%= turbo_frame_tag "member-links-#{@user_id}", target: "_top",
+            src: fd_member_links_path(@user_id), loading: "lazy" do %>
+        <p class="card-note">Reading the links…</p>
       <% end %>
     </div>
   <% end %>

@@ -8,6 +8,7 @@ from ingest.access_logs_pull import run as walk_access_logs
 from ingest.audit_logs_pull import backfill as walk_backfill
 from ingest.audit_logs_pull import tail as walk_tail
 from ingest.ip_cohorts import run as refresh_cohorts
+from ingest.member_links import run as refresh_links
 from lib.db import (
     AlreadyRunning,
     SeededDeployment,
@@ -28,6 +29,7 @@ DEFAULT_TAIL_SECONDS = 60
 DEFAULT_BACKFILL_SECONDS = 120
 DEFAULT_ACCESS_SECONDS = 3600
 DEFAULT_COHORT_SECONDS = 900
+DEFAULT_LINK_SECONDS = 1800
 JOIN_TIMEOUT = 10
 BUSY_POLL_SECONDS = 2
 REFUSED_BACKOFF_SECONDS = 900
@@ -53,6 +55,7 @@ LANES = (
     ("backfill", walk_backfill, "AUDIT_BACKFILL_SECONDS", DEFAULT_BACKFILL_SECONDS),
     ("access", walk_access_logs, "AUDIT_ACCESS_SECONDS", DEFAULT_ACCESS_SECONDS),
     ("cohorts", refresh_cohorts, "AUDIT_COHORT_SECONDS", DEFAULT_COHORT_SECONDS),
+    ("links", refresh_links, "AUDIT_LINK_SECONDS", DEFAULT_LINK_SECONDS),
 )
 
 OPTIONAL = ("backfill",)

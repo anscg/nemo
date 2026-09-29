@@ -292,6 +292,21 @@ sources:
     writes: [slack.audit_event, fd.login_event, fd.member_channel_join]
     feeds: []
 
+  member_links:
+    unit_budget_seconds: 300
+    standalone: true
+    label: Accounts that look like they belong to the same person
+    endpoint: none
+    documented: true
+    credential: none
+    cadence: live
+    window: everything we hold
+    guard: none
+    resume: none
+    retention: replace
+    writes: [fd.member_link]
+    feeds: []
+
   access_logs:
     unit_budget_seconds: 180
     standalone: true

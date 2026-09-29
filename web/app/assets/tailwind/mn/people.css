@@ -656,7 +656,7 @@
 
 @layer components {
   .col-pick { width: 40px; text-align: center; }
-  .pick {
+  .tickbox {
     accent-color: var(--accent);
     width: 15px;
     height: 15px;

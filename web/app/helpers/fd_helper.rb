@@ -232,6 +232,23 @@ module FdHelper
       class: "state #{SCREEN_TONES.fetch(screen.outcome, '')}".strip)
   end
 
+  def link_band_chip(side)
+    tone = { "certain" => "state-crit", "strong" => "state-warn" }.fetch(side.band, "")
+    tag.span(side.band, class: "state #{tone}".strip)
+  end
+
+  def link_score_chip(score)
+    said = score.to_f
+    tone = if said >= Fd::MemberLink::CERTAIN
+      "state-crit"
+    elsif said >= Fd::MemberLink::STRONG
+      "state-warn"
+    else
+      ""
+    end
+    tag.span(number_with_precision(said, precision: 1), class: "state #{tone}".strip)
+  end
+
   def session_span(first_at, last_at)
     return "n/a" if first_at.nil? || last_at.nil?
     return on_day(last_at) if first_at.to_date == last_at.to_date
@@ -395,7 +412,7 @@ module FdHelper
   Stop = Struct.new(:key, :label, :icon, :path, :here, :tally, keyword_init: true)
 
   NAV_HOME = { "fd/fire" => "overview", "fd/members" => "members",
-               "fd/joiners" => "joiners",
+               "fd/joiners" => "joiners", "fd/member_links" => "links",
                "fd/channels" => "channels", "fd/audits" => "audit",
                "fd/configuration" => "configuration",
                "fd/channel_purges" => "channels" }.freeze
@@ -420,6 +437,10 @@ module FdHelper
     if current_account&.may?("app.configure")
       stops << Stop.new(key: "configuration", label: "Configuration", icon: "gear",
         path: fd_configuration_path)
+    end
+    if current_account&.may?("member.links")
+      stops << Stop.new(key: "links", label: "Linked accounts", icon: "people",
+        path: fd_links_path)
     end
     if current_account&.may?("access.read")
       stops << Stop.new(key: "audit", label: "Audit log", icon: "history", path: fd_audit_path)

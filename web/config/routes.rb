@@ -42,11 +42,13 @@ Rails.application.routes.draw do
          as: :configuration_unsub_shield
     resources :joiners, only: [:index]
     resources :bulk_deactivations, only: [:create], path: "joiners/deactivate"
+    resources :links, only: [:index], controller: "member_links"
     resources :members, only: [:index, :show] do
       resources :notes, only: [:create, :destroy], controller: "member_notes"
       resources :guards, only: [:create, :update, :destroy], controller: "member_guards"
       resource :standing, only: [:show], controller: "member_standings"
       resource :logins, only: [:show], controller: "member_logins"
+      resource :links, only: [:show], controller: "member_link_panes"
     end
     resources :files, only: [:show]
     resource :search, only: [:show], controller: "searches"

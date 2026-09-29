@@ -22,6 +22,7 @@ roles:
       - member.note
       - member.guard
       - member.deactivate
+      - member.links
       - identity.read
       - slack.link
       - channel.read
@@ -158,6 +159,12 @@ capabilities:
   member.read:
     label: See member names in the analytics
     area: member
+
+  member.links:
+    label: See the accounts that look like the same person
+    area: member
+    locked: true
+    logged: true
 
   identity.read:
     label: See the real name and email behind an id

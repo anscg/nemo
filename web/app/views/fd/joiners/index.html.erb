@@ -53,7 +53,7 @@
               <tr>
                 <% if may_deactivate %>
                   <th class="col-pick">
-                    <%= check_box_tag "pick_all", "1", false, id: nil, class: "pick",
+                    <%= check_box_tag "pick_all", "1", false, id: nil, class: "tickbox",
                           aria: { label: "Pick everybody on this page" },
                           data: { pick_rows_target: "all",
                                   action: "change->pick-rows#toggleAll" } %>
@@ -74,7 +74,7 @@
                 <tr data-picked-row>
                   <% if may_deactivate %>
                     <td class="col-pick">
-                      <%= check_box_tag "pick", row.user_id, false, id: nil, class: "pick",
+                      <%= check_box_tag "pick", row.user_id, false, id: nil, class: "tickbox",
                             aria: { label: "Pick #{row.handle || row.user_id}" },
                             disabled: row.deactivated?,
                             data: { pick_rows_target: "box",
