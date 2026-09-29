@@ -361,6 +361,36 @@ def test_a_landed_event_is_never_written_twice():
     assert "ON CONFLICT (audit_id) DO NOTHING" in pull.CHANNEL_SQL
 
 
+def test_an_address_slack_carried_fills_an_identity_we_never_had():
+    row = pull.identity_row(entry(actor={"type": "user", "user": {
+        "id": WHO, "name": "Aleksa Lutovac", "email": "kid@throwaway.example"}}))
+
+    assert row[0] == WHO
+    assert row[1] == "Aleksa Lutovac"
+    assert row[2] == "kid@throwaway.example"
+
+
+def test_an_actor_with_no_address_leaves_the_identity_alone():
+    assert pull.identity_row(entry()) is None
+    assert pull.identity_row(entry(actor={"type": "user", "user": {"id": WHO}})) is None
+    assert pull.identity_row(entry(actor={"type": "app", "app": {"id": "A1"}})) is None
+
+
+def test_an_identity_we_already_hold_is_never_written_over():
+    assert "coalesce(fd.member_identity.email, EXCLUDED.email)" in pull.IDENTITY_SQL
+    assert "purged_at IS NULL" in pull.IDENTITY_SQL, "a purged identity must stay purged"
+    assert "EXISTS (SELECT 1 FROM fd.member" in pull.IDENTITY_SQL
+
+
+def test_one_write_per_member_a_page_however_often_they_appear():
+    conn, counts = Conn(), Counts()
+    said = {"type": "user", "user": {"id": WHO, "name": "Zev", "email": "z@throwaway.example"}}
+    pull.land(conn, [entry(actor=said), entry(id="b", actor=said), entry(id="c", actor=said)],
+              "audit_logs_tail", frozenset(), counts)
+
+    assert len(conn.did("INSERT INTO fd.member_identity")[0]) == 1
+
+
 ROOM = {"type": "channel", "channel": {"id": "C1", "name": "lounge", "privacy": "public"}}
 
 

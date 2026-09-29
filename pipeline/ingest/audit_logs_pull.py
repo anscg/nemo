@@ -61,6 +61,18 @@ ON CONFLICT (user_id, at, source) DO UPDATE SET
     updated_at = now()
 """
 
+IDENTITY_SQL = """
+INSERT INTO fd.member_identity (user_id, real_name, email, updated_at)
+SELECT %s, %s, %s, now()
+WHERE EXISTS (SELECT 1 FROM fd.member m WHERE m.user_id = %s)
+ON CONFLICT (user_id) DO UPDATE SET
+    email = coalesce(fd.member_identity.email, EXCLUDED.email),
+    real_name = coalesce(fd.member_identity.real_name, EXCLUDED.real_name),
+    updated_at = now()
+WHERE fd.member_identity.purged_at IS NULL
+  AND (fd.member_identity.email IS NULL OR fd.member_identity.real_name IS NULL)
+"""
+
 CHANNEL_SQL = """
 INSERT INTO fd.member_channel_join
     (audit_id, at, user_id, channel_id, channel_name, privacy, verb, by_workflow)
@@ -198,6 +210,20 @@ def login_row(entry):
     )
 
 
+def identity_row(entry):
+    who = (entry.get("actor") or {}).get("user") or {}
+    if (entry.get("actor") or {}).get("type") != "user":
+        return None
+
+    user_id = who.get("id")
+    email = (who.get("email") or "").strip() or None
+    name = (who.get("name") or "").strip() or None
+    if not user_id or email is None:
+        return None
+
+    return (user_id, name, email, user_id)
+
+
 def channel_row(entry):
     verb = ROOMED.get(entry.get("action"))
     if verb is None:
@@ -217,6 +243,7 @@ def channel_row(entry):
 
 def land(conn, entries, source_key, ours, counts):
     events, logins, rooms = [], [], []
+    named = {}
     for entry in entries:
         row = event_row(entry, source_key, ours)
         if row is None:
@@ -230,6 +257,9 @@ def land(conn, entries, source_key, ours, counts):
         roomed = channel_row(entry)
         if roomed:
             rooms.append(roomed)
+        knew = identity_row(entry)
+        if knew:
+            named[knew[0]] = knew
 
     if events:
         with conn.cursor() as cur:
@@ -238,6 +268,8 @@ def land(conn, entries, source_key, ours, counts):
                 cur.executemany(LOGIN_SQL, logins)
             if rooms:
                 cur.executemany(CHANNEL_SQL, rooms)
+            if named:
+                cur.executemany(IDENTITY_SQL, list(named.values()))
     conn.commit()
     counts.rows_in += len(events)
     return len(events), len(logins)

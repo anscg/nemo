@@ -2,6 +2,20 @@ module Fd
   class JoinersController < BaseController
     permit "case.read"
 
+    def show
+      user_id = params[:id].to_s.upcase
+      row = JoinerQuery.new({ "when" => "any" }, actor: current_account).one(user_id)
+      return head :not_found if row.nil?
+
+      if row.email.present?
+        AccessLog.record!(actor: current_account, subject_user_id: user_id,
+          field_class: "identity")
+      end
+
+      render partial: "fd/joiners/card", layout: false,
+        locals: { row: row, names: Names.for([user_id]) }
+    end
+
     def index
       @query = JoinerQuery.new(params, actor: current_account)
       @rows = @query.rows

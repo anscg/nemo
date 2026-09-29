@@ -5,11 +5,10 @@ module Fd
     Facet = Struct.new(:key, :label, :value, :value_label, :options, :on, :kind,
       keyword_init: true)
     View = Struct.new(:key, :label, :count, :current, keyword_init: true)
-    Row = Struct.new(:user_id, :joined_at, :source, :nearest_join, :handle, :display_name,
+    Row = Struct.new(:user_id, :joined_at, :source, :handle, :display_name,
       :avatar_hash, :email, :domain, :domain_people, :in_force, :kinds, :deactivated,
-      :seen_app, :seen_country, :seen_people, keyword_init: true) do
-      def burst? = nearest_join.present? && nearest_join <= BURST_SECONDS
-
+      :seen_app, :seen_country, :seen_people, :real_name, :ip, :region, :isp, :seen_os,
+      :raw_agent, :seen_at, keyword_init: true) do
       def deactivated? = deactivated
 
       def guarded? = in_force.to_i.positive?
@@ -23,25 +22,36 @@ module Fd
       def crowded? = seen_people.to_i >= CROWDED
 
       def close_company? = seen_people.to_i.between?(2, CROWDED - 1)
+
+      def name = real_name.presence || display_name.presence || handle.presence
+
+      def client
+        [seen_app, seen_os].compact_blank.join(" on ").presence
+      end
+
+      def where_from
+        [Fd::Countries.name_for(seen_country), isp].compact_blank.join(", ").presence
+      end
+
+      def flag = Fd::Countries.flag_for(seen_country)
+
+      def detail? = [email, ip, client, where_from].any?(&:present?)
     end
 
-    BURST_SECONDS = 120
     CROWDED = 20
     LIMIT = 50
     MIN_TERM = 2
 
     VIEWS = {
       "newest" => "Newest",
-      "burst" => "Arrived together",
       "guarded" => "Under a guard",
       "gone" => "Deactivated"
     }.freeze
 
-    TABS = %w[newest burst guarded gone].freeze
+    TABS = %w[newest guarded gone].freeze
 
     VIEW_FACETS = {
       "newest" => {},
-      "burst" => { "shape" => "burst" },
       "guarded" => { "state" => "guarded" },
       "gone" => { "state" => "gone" }
     }.freeze
@@ -50,8 +60,7 @@ module Fd
              "any" => "any time" }.freeze
     STATE = { "any" => "any", "clean" => "nothing on record", "guarded" => "under a guard",
               "gone" => "deactivated" }.freeze
-    SHAPE = { "any" => "any", "burst" => "arrived together",
-              "lone" => "first on their domain" }.freeze
+    SHAPE = { "any" => "any", "lone" => "first on their domain" }.freeze
     SORT = { "joined" => "when they joined", "domain" => "email domain",
              "name" => "name" }.freeze
     DIRS = %w[desc asc].freeze
@@ -197,6 +206,14 @@ module Fd
         .map { |row| build(row) }
     end
 
+    def one(user_id)
+      said = user_id.to_s.strip
+      return nil if said.blank?
+
+      found = ask(body("*", "user_id = :who"), who: said).first
+      found && build(found)
+    end
+
     def total
       @total ||= ask(count_sql).first["found"].to_i
     end
@@ -231,7 +248,6 @@ module Fd
       return "Nobody who joined #{WHEN.fetch(self[WINDOW_KEY])} matches #{term}." if asked?
 
       case view
-      when "burst" then "Nobody arrived alongside somebody else."
       when "guarded" then "Nobody who joined lately is under a guard."
       when "gone" then "Nobody who joined lately has been deactivated."
       else "Nobody joined in this window."
@@ -279,8 +295,10 @@ module Fd
       end
     end
 
-    IDENTITY_COLUMNS = ", mi.email, lower(split_part(mi.email, '@', 2)) AS domain".freeze
-    BLIND_COLUMNS = ", NULL::text AS email, NULL::text AS domain".freeze
+    IDENTITY_COLUMNS =
+      ", mi.email, lower(split_part(mi.email, '@', 2)) AS domain, mi.real_name".freeze
+    BLIND_COLUMNS =
+      ", NULL::text AS email, NULL::text AS domain, NULL::text AS real_name".freeze
 
     IDENTITY_JOIN = <<~SQL.freeze
       LEFT JOIN fd.member_identity mi
@@ -289,18 +307,30 @@ module Fd
 
     SEEN_COLUMNS =
       ", seen.ua_app AS seen_app, seen.country AS seen_country, " \
-      "coalesce(cohort.people, 0) AS seen_people".freeze
+      "coalesce(cohort.people, 0) AS seen_people, " \
+      "host(seen.ip) AS ip, seen.region AS region, place.isp AS isp, " \
+      "seen.ua_os AS seen_os, seen.ua AS raw_agent, seen.at AS seen_at".freeze
     BLIND_SEEN =
-      ", NULL::text AS seen_app, NULL::text AS seen_country, 0 AS seen_people".freeze
+      ", NULL::text AS seen_app, NULL::text AS seen_country, 0 AS seen_people, " \
+      "NULL::text AS ip, NULL::text AS region, NULL::text AS isp, " \
+      "NULL::text AS seen_os, NULL::text AS raw_agent, " \
+      "NULL::timestamptz AS seen_at".freeze
 
     SEEN_JOIN = <<~SQL.freeze
       LEFT JOIN LATERAL (
-        SELECT l.ua_app, l.country, l.ip_prefix
+        SELECT l.ua_app, l.ua_os, l.ua, l.country, l.region, l.isp, l.ip, l.ip_prefix, l.at
         FROM fd.login_event l
         WHERE l.user_id = j.user_id
         ORDER BY l.at DESC
         LIMIT 1
       ) seen ON true
+      LEFT JOIN LATERAL (
+        SELECT l.isp
+        FROM fd.login_event l
+        WHERE l.user_id = j.user_id AND l.isp IS NOT NULL
+        ORDER BY l.at DESC
+        LIMIT 1
+      ) place ON true
       LEFT JOIN fd.ip_cohort cohort ON cohort.ip_prefix = seen.ip_prefix
     SQL
 
@@ -325,10 +355,6 @@ module Fd
         )#{identity? ? DOMAIN_TALLY : ''}
         , picked AS (
           SELECT j.user_id, j.joined_at, j.source,
-                 CASE WHEN j.source = 'team_join' THEN least(
-                   coalesce(extract(epoch FROM j.joined_at - j.before_at), 1e9),
-                   coalesce(extract(epoch FROM j.after_at - j.joined_at), 1e9)
-                 ) END AS nearest_join,
                  m.handle, m.display_name, m.avatar_hash
                  #{identity? ? IDENTITY_COLUMNS : BLIND_COLUMNS},
                  #{identity? ? 'coalesce(d.people, 0)' : '0'} AS domain_people,
@@ -370,7 +396,6 @@ module Fd
 
     def picked_clause
       parts = ["true"]
-      parts << "nearest_join <= #{BURST_SECONDS}" if self["shape"] == "burst"
       parts << "domain IS NOT NULL AND domain_people <= 1" if self["shape"] == "lone"
       parts << "in_force = 0 AND NOT deactivated" if self["state"] == "clean"
       parts << "in_force > 0" if self["state"] == "guarded"
@@ -419,19 +444,20 @@ module Fd
     def build(row)
       Row.new(
         user_id: row["user_id"], joined_at: row["joined_at"], source: row["source"],
-        nearest_join: row["nearest_join"]&.to_f, handle: row["handle"],
+        handle: row["handle"],
         display_name: row["display_name"], avatar_hash: row["avatar_hash"],
         email: row["email"], domain: row["domain"],
         domain_people: row["domain_people"].to_i, in_force: row["in_force"].to_i,
         kinds: row["kinds"].to_s.split(","), deactivated: row["deactivated"],
         seen_app: row["seen_app"], seen_country: row["seen_country"],
-        seen_people: row["seen_people"].to_i
+        seen_people: row["seen_people"].to_i, real_name: row["real_name"],
+        ip: row["ip"], region: row["region"], isp: row["isp"],
+        seen_os: row["seen_os"], raw_agent: row["raw_agent"], seen_at: row["seen_at"]
       )
     end
 
     def counted
       "count(*) AS newest, " \
-        "count(*) FILTER (WHERE nearest_join <= #{BURST_SECONDS}) AS burst, " \
         "count(*) FILTER (WHERE in_force > 0) AS guarded, " \
         "count(*) FILTER (WHERE deactivated) AS gone"
     end
@@ -455,7 +481,6 @@ module Fd
 
     def shape_phrase
       case self["shape"]
-      when "burst" then "arriving alongside somebody else"
       when "lone" then "first on their email domain"
       end
     end

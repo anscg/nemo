@@ -40,7 +40,7 @@ Rails.application.routes.draw do
          as: :configuration_autoresponse
     post "configuration/responses/unsub_shield", to: "responses#unsub_shield",
          as: :configuration_unsub_shield
-    resources :joiners, only: [:index]
+    resources :joiners, only: [:index, :show]
     resources :bulk_deactivations, only: [:create], path: "joiners/deactivate"
     resources :links, only: [:index], controller: "member_links"
     resources :members, only: [:index, :show] do

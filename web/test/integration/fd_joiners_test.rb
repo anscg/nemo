@@ -28,25 +28,6 @@ class FdJoinersTest < ActionDispatch::IntegrationTest
     assert_includes query({ "when" => "any" }).rows.map(&:user_id), "UOLD1"
   end
 
-  test "two who arrived within two minutes read as a burst" do
-    joined!("UB1", at: 3.hours.ago)
-    joined!("UB2", at: 3.hours.ago + 30.seconds)
-    joined!("ULONE", at: 2.days.ago)
-
-    caught = query({ "view" => "burst" }).rows.map(&:user_id)
-    assert_includes caught, "UB1"
-    assert_includes caught, "UB2"
-    assert_not_includes caught, "ULONE"
-  end
-
-  test "a backfilled join is never counted as a burst, its clock is only a day wide" do
-    joined!("UC1", at: 3.hours.ago, source: "cohort")
-    joined!("UC2", at: 3.hours.ago, source: "cohort")
-
-    assert_empty query({ "view" => "burst" }).rows
-    assert_nil query({ "when" => "week" }).rows.find { |row| row.user_id == "UC1" }.nearest_join
-  end
-
   test "email is only there for somebody who may read identity" do
     joined!("UE1", at: 1.hour.ago, email: "kid@school.example")
 
@@ -94,7 +75,6 @@ class FdJoinersTest < ActionDispatch::IntegrationTest
 
     counts = query({ "view" => "gone" }).views.index_by(&:key)
     assert_equal 2, counts["newest"].count
-    assert_equal 2, counts["burst"].count
     assert_equal 1, counts["gone"].count
   end
 
@@ -127,21 +107,21 @@ class FdJoinersTest < ActionDispatch::IntegrationTest
   end
 
   test "a tab and a date range hold at the same time" do
-    asked = query({ "view" => "burst", "when" => "day" })
+    asked = query({ "view" => "guarded", "when" => "day" })
 
-    assert_equal "burst", asked.view, "picking a window must not drop the tab"
+    assert_equal "guarded", asked.view, "picking a window must not drop the tab"
     assert_equal "day", asked["when"]
-    assert_equal "burst", asked.window_params("month")["view"]
+    assert_equal "guarded", asked.window_params("month")["view"]
     assert_equal "day", asked.view_params("gone")["when"]
   end
 
   test "a search holds across a tab and a window" do
-    asked = query({ "view" => "burst", "when" => "day", "q" => "zev" })
+    asked = query({ "view" => "guarded", "when" => "day", "q" => "zev" })
 
     assert_equal "zev", asked.term
     assert_equal "zev", asked.window_params("month")["q"]
     assert_equal "zev", asked.view_params("gone")["q"]
-    assert_equal "burst", asked.view
+    assert_equal "guarded", asked.view
   end
 
   test "a search finds them by handle, and by email only if identity is readable" do
@@ -227,5 +207,90 @@ class FdJoinersTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { AccessLog.count } do
       get fd_joiners_path
     end
+  end
+end
+
+class FdJoinerCardTest < ActionDispatch::IntegrationTest
+  include SeedsPipelineTables
+
+  setup do
+    @me = hold_role!("UME", "community_manager")
+    sign_in_as(@me)
+    member!("UJOIN", email: "kid@throwaway.example")
+    as_pipeline("INSERT INTO fd.member_joins (user_id, joined_at, source) " \
+                "VALUES (?, now(), 'team_join') ON CONFLICT (user_id) DO NOTHING", "UJOIN")
+    seeded!("fd.member_joins", "user_id", "UJOIN")
+    as_pipeline(<<~SQL.squish, "UJOIN")
+      INSERT INTO fd.login_event (user_id, at, source, action, ip, ua, ua_app, ua_os,
+                                  country, isp)
+      VALUES (?, now(), 'audit_logs', 'user_login', '185.26.172.245'::inet,
+              'Mozilla/5.0 (iPhone; CPU iPhone OS 26_4_2 like Mac OS X) CriOS/154.0.8037.55',
+              'Chrome 154.0.8037.55', 'iOS 26.4.2', 'RS', 'TELEKOM SRBIJA a.d.')
+      ON CONFLICT DO NOTHING
+    SQL
+    seeded!("fd.login_event", "user_id", "UJOIN")
+  end
+
+  test "the card carries everything the firehouse note used to" do
+    get fd_joiner_path("UJOIN")
+    assert_response :success
+
+    assert_match "kid@throwaway.example", response.body
+    assert_match "UJOIN", response.body
+    assert_match "185.26.172.245", response.body
+    assert_match "Chrome 154.0.8037.55 on iOS 26.4.2", response.body
+    assert_match "Serbia", response.body
+    assert_match "TELEKOM SRBIJA", response.body
+    assert_match "CriOS/154.0.8037.55", response.body, "the whole agent string is shown"
+    assert_match "\u{1F1F7}\u{1F1F8}", response.body, "the flag is drawn from the country"
+  end
+
+  test "the table shows the address and the country it came from" do
+    get fd_joiners_path
+    assert_response :success
+
+    assert_select "th", text: "IP"
+    assert_select "th", text: "Country"
+    assert_select "th", text: "On domain", count: 0
+    assert_select "th", text: "Last seen from", count: 0
+    assert_match "185.26.172.245", response.body
+    assert_match "Serbia", response.body
+  end
+
+  test "the card is a frame the page can swap in" do
+    get fd_joiner_path("UJOIN")
+    assert_select %(turbo-frame[id="joiner-card"])
+  end
+
+  test "reading a card with an email on it is written down" do
+    assert_difference -> { AccessLog.where(field_class: "identity").count }, 1 do
+      get fd_joiner_path("UJOIN")
+    end
+    assert_equal "UJOIN", AccessLog.where(field_class: "identity").last.subject_user_id
+  end
+
+  test "somebody who never signed in still has a card" do
+    member!("UQUIET")
+    as_pipeline("INSERT INTO fd.member_joins (user_id, joined_at, source) " \
+                "VALUES (?, now(), 'team_join') ON CONFLICT (user_id) DO NOTHING", "UQUIET")
+    seeded!("fd.member_joins", "user_id", "UQUIET")
+
+    get fd_joiner_path("UQUIET")
+    assert_response :success
+    assert_match "never signed in", response.body
+  end
+
+  test "a joiner nobody has heard of is not found" do
+    get fd_joiner_path("UNOBODY")
+    assert_response :not_found
+  end
+
+  test "a card is reachable however long ago they joined" do
+    as_pipeline("UPDATE fd.member_joins SET joined_at = now() - interval '200 days' " \
+                "WHERE user_id = ?", "UJOIN")
+
+    get fd_joiner_path("UJOIN")
+    assert_response :success
+    assert_match "185.26.172.245", response.body
   end
 end

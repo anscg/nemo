@@ -44,10 +44,11 @@
               <col style="width: 18%">
               <% if @query.identity? %>
                 <col style="width: 22%">
-                <col style="width: 8%">
-                <col style="width: 18%">
+                <col style="width: 14%">
+                <col style="width: 12%">
               <% end %>
               <col style="width: 16%">
+              <col style="width: 44px">
             </colgroup>
             <thead>
               <tr>
@@ -63,10 +64,11 @@
                 <%= joiner_sort_header("Joined", "joined") %>
                 <% if @query.identity? %>
                   <%= joiner_sort_header("Email", "domain") %>
-                  <th class="col-num">On domain</th>
-                  <th>Last seen from</th>
+                  <th>IP</th>
+                  <th>Country</th>
                 <% end %>
                 <th class="col-num">Standing</th>
+                <th class="col-num"></th>
               </tr>
             </thead>
             <tbody>
@@ -90,9 +92,6 @@
                         <% end %>
                         <span>
                           <%= row.handle.present? ? "@#{row.handle}" : row.user_id %>
-                          <% if row.burst? %>
-                            &middot; <span class="state state-warn">arrived together</span>
-                          <% end %>
                         </span>
                       </span>
                     </span>
@@ -121,14 +120,23 @@
                         not on file
                       <% end %>
                     </td>
-                    <td class="col-num <%= "is-none" if row.domain.blank? %>">
-                      <%= row.domain.present? ? number_with_delimiter(row.domain_people) : "n/a" %>
+                    <td class="<%= "is-none" if row.ip.blank? %>">
+                      <%= joiner_ip(row) %>
                     </td>
-                    <td class="<%= "is-none" if row.seen_from.blank? %>">
-                      <%= joiner_seen(row) %>
+                    <td class="<%= "is-none" if row.seen_country.blank? %>">
+                      <%= joiner_country(row) %>
                     </td>
                   <% end %>
                   <td class="col-num"><%= joiner_standing(row) %></td>
+                  <td class="col-num">
+                    <button type="button" class="btn btn-sm"
+                            data-modal-open="joiner-card"
+                            data-joiner-card="<%= fd_joiner_path(row.user_id) %>"
+                            aria-haspopup="dialog"
+                            aria-label="Everything we hold on <%= row.handle || row.user_id %>">
+                      <%= case_action_icon("people") %>
+                    </button>
+                  </td>
                 </tr>
               <% end %>
             </tbody>
@@ -151,3 +159,15 @@
     <% end %>
   </div>
 </turbo-frame>
+
+<div data-controller="joiner-card">
+  <%= render layout: "fd/modal", locals: { id: "joiner-card", title: "Joiner",
+        size: "wide", open: false } do %>
+    <div class="modal-body">
+      <%= turbo_frame_tag "joiner-card", target: "_top",
+            data: { joiner_card_target: "frame" } do %>
+        <p class="card-note">Reading what we hold…</p>
+      <% end %>
+    </div>
+  <% end %>
+</div>

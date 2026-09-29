@@ -264,13 +264,24 @@ module FdHelper
     tag.span("theirs alone", class: "state state-good")
   end
 
-  def joiner_seen(row)
-    return "no sign-in on file" if row.seen_from.blank?
+  def joiner_country(row)
+    return tag.span("n/a", class: "sub2") if row.seen_country.blank?
 
     safe_join([
-      tag.span(row.seen_from),
-      (if row.close_company?
-         tag.span("#{row.seen_people - 1} others here", class: "state state-warn")
+      (tag.span(row.flag, class: "joiner-flag") if row.flag),
+      tag.span(Fd::Countries.name_for(row.seen_country))
+    ].compact, " ")
+  end
+
+  def joiner_ip(row)
+    return tag.span("never signed in", class: "sub2") if row.ip.blank?
+
+    safe_join([
+      tag.span(row.ip, class: "mono"),
+      (if row.crowded?
+         tag.span("#{row.seen_people} here", class: "state state-warn")
+       elsif row.close_company?
+         tag.span("#{row.seen_people} here", class: "state")
        end)
     ].compact, " ")
   end
@@ -288,7 +299,7 @@ module FdHelper
     end
   end
 
-  JOINER_SOURCE = { "team_join" => "watched them arrive", "by_hand" => "written down by hand",
+  JOINER_SOURCE = { "by_hand" => "written down by hand",
                     "cohort" => "from the cohort table" }.freeze
 
   def joiner_when(row)
@@ -427,8 +438,8 @@ module FdHelper
       Stop.new(key: "cases", label: "Cases", icon: "shield", path: fd_cases_path,
         tally: Fd::Case.unresolved.not_duplicate.unassigned.count),
       Stop.new(key: "members", label: "Members", icon: "people", path: fd_members_path),
-      Stop.new(key: "joiners", label: "Joiners", icon: "people", path: fd_joiners_path),
-      Stop.new(key: "channels", label: "Channels", icon: "channels", path: fd_channels_path)
+      Stop.new(key: "channels", label: "Channels", icon: "channels", path: fd_channels_path),
+      Stop.new(key: "joiners", label: "Joiners", icon: "newcomers", path: fd_joiners_path)
     ])
   end
 
