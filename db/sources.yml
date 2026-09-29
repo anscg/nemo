@@ -292,6 +292,21 @@ sources:
     writes: [slack.audit_event, fd.login_event, fd.member_channel_join]
     feeds: []
 
+  useragent_reparse:
+    unit_budget_seconds: 120
+    standalone: true
+    label: Agent strings landed before the reader knew how to read them
+    endpoint: none
+    documented: true
+    credential: none
+    cadence: live
+    window: everything we hold
+    guard: none
+    resume: none
+    retention: keep
+    writes: [fd.login_event]
+    feeds: []
+
   member_links:
     unit_budget_seconds: 300
     standalone: true

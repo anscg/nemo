@@ -66,7 +66,7 @@ def test_a_login_carries_the_address_the_agent_and_the_session():
     assert row[0] == WHO
     assert row[2] == "user_login"
     assert row[3] == "157.51.215.171"
-    assert row[5] == "Chrome 141"
+    assert row[5] == "Chrome 141.0.0.0"
     assert row[6] == "Windows 10 or 11"
     assert row[7] == 12177102026566
 
@@ -416,14 +416,23 @@ def test_the_rooms_are_projected_org_wide_not_only_where_nemo_sits():
 
 @pytest.mark.parametrize(("said", "app", "system"), [
     ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36",
-     "Chrome 141", "Windows 10 or 11"),
+     "Chrome 141.0.0.0", "Windows 10 or 11"),
     ("slack/26.09.41.0.90016209 (samsung SM-A235F; Android 14; store com.android.vending)",
-     "Slack Android 26", "Android 14"),
+     "Slack Android 26.09.41.0.90016209", "Android 14"),
     ("Python/3.13.15 slackclient/3.43.0 Linux/4.19.0-gvisor", "Slack SDK", "Linux"),
     ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Slack_SSB/4.45.69 Electron/32.2.5",
-     "Slack Desktop 4", "macOS 10.15.7"),
+     "Slack Desktop 4.45.69", "macOS 10.15.7"),
     ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) Version/18.2 Safari/604.1",
-     "Safari 18", "iOS 18.2"),
+     "Safari 18.2", "iOS 18.2"),
+    ("com.tinyspeck.chatlyio/26.09.20 (iPhone; iOS 26.6.2; Scale/3.00)",
+     "Slack iOS 26.09.20", "iOS 26.6.2"),
+    ("com.tinyspeck.chatlyio.NotificationService/26.09.30 (iPhone; iOS 27.0; Scale/3.00)",
+     "Slack iOS 26.09.30", "iOS 27.0"),
+    ("Mozilla/5.0 (iPhone; CPU iPhone OS 26_4_2 like Mac OS X) AppleWebKit/605.1.15 "
+     "(KHTML, like Gecko) CriOS/154.0.8037.55 Mobile/15E148 Safari/604.1",
+     "Chrome 154.0.8037.55", "iOS 26.4.2"),
+    ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) FxiOS/127.0 Mobile Safari/605.1",
+     "Firefox 127.0", "iOS 17.5"),
 ])
 def test_the_agent_string_is_read_into_an_app_and_a_system(said, app, system):
     seen = useragent.parse(said)
@@ -434,3 +443,39 @@ def test_the_agent_string_is_read_into_an_app_and_a_system(said, app, system):
 def test_an_agent_string_nobody_recognises_does_not_blow_up():
     assert useragent.parse("") == {"ua": None, "ua_app": None, "ua_os": None}
     assert useragent.parse("something else entirely")["ua_app"] is None
+
+
+def test_the_agent_string_is_kept_whole_however_long_it_is():
+    said = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " + "Padding/1.0 " * 60 + "End/1"
+    assert len(said) > 700
+    assert useragent.parse(said)["ua"] == said, "the raw agent string is never cut short"
+
+
+def test_a_version_is_kept_whole_rather_than_cut_to_its_first_number():
+    seen = useragent.parse("Mozilla/5.0 (Windows NT 10.0) Chrome/154.0.8037.55 Safari/537.36")
+    assert seen["ua_app"] == "Chrome 154.0.8037.55"
+    assert not hasattr(useragent, "major"), "nothing should be rounding a version down"
+    assert not hasattr(useragent, "short"), "nothing should be cutting a string short"
+
+
+def test_the_slack_phone_apps_are_told_apart_from_a_browser_on_the_phone():
+    phone = useragent.parse("com.tinyspeck.chatlyio/26.09.20 (iPhone; iOS 26.6.2; Scale/3.00)")
+    browser = useragent.parse(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 26_4_2 like Mac OS X) CriOS/154.0.8037.55 Safari/604.1")
+
+    assert phone["ua_app"].startswith("Slack iOS")
+    assert browser["ua_app"].startswith("Chrome")
+    assert phone["ua_os"] == "iOS 26.6.2"
+    assert browser["ua_os"] == "iOS 26.4.2"
+
+
+def test_an_agent_landed_before_the_reader_knew_it_is_read_again():
+    from ingest import useragent_reparse
+
+    assert "ua_app IS NULL OR ua_os IS NULL" in useragent_reparse.UNREAD
+    assert "ua IS NOT NULL" in useragent_reparse.UNREAD
+
+    said = (pathlib.Path(__file__).parents[2] / "db" / "migrations"
+            / "0150_unread_agents.sql").read_text()
+    assert "login_event_unread_agent_idx" in said
+    assert "WHERE ua IS NOT NULL" in said, "the sweep must be free once it has drained"
