@@ -96,14 +96,14 @@ class FdJoinersTest < ActionDispatch::IntegrationTest
     assert_match "school.example", response.body
   end
 
-  test "reading the emails on the page is written down against the reader" do
+  test "reading the joiners page leaves nothing in the engine's own trail" do
     joined!("UL1", at: 1.hour.ago, email: "kid@school.example")
     sign_in_as(@me)
 
-    assert_difference -> { AccessLog.where(field_class: "identity_search").count }, 1 do
+    assert_no_difference -> { AccessLog.count } do
+      get fd_joiners_path
       get fd_joiners_path
     end
-    assert_equal "UL1", AccessLog.where(field_class: "identity_search").last.subject_user_id
   end
 
   test "a tab and a date range hold at the same time" do
@@ -262,11 +262,10 @@ class FdJoinerCardTest < ActionDispatch::IntegrationTest
     assert_select %(turbo-frame[id="joiner-card"])
   end
 
-  test "reading a card with an email on it is written down" do
-    assert_difference -> { AccessLog.where(field_class: "identity").count }, 1 do
+  test "opening a card leaves nothing in the engine's own trail either" do
+    assert_no_difference -> { AccessLog.count } do
       get fd_joiner_path("UJOIN")
     end
-    assert_equal "UJOIN", AccessLog.where(field_class: "identity").last.subject_user_id
   end
 
   test "somebody who never signed in still has a card" do
