@@ -16,7 +16,7 @@ class PermissionSweepTest < ActionDispatch::IntegrationTest
   FD_PATHS = %w[/fd /fd/cases /fd/members /fd/search
                 /fd/members/search].freeze
 
-  # the audit is its own gate, access.read, not the conduct team's
+  # the conduct team reaches the audit, but the engine's own record is access.read
   AUDIT_PATH = "/fd/audit".freeze
 
   ADMIN_PATHS = %w[/admin /admin/people /admin/roles /admin/flags /admin/channels
@@ -89,14 +89,35 @@ class PermissionSweepTest < ActionDispatch::IntegrationTest
     assert_empty leaked, leaked.join("\n")
   end
 
-  test "the audit trail is behind access.read, on its own" do
+  test "the audit is behind case.read, like the rest of the fire engine" do
+    leaked = []
+    PERSONAS.each_key do |name|
+      id = become(name)
+      may = Authz.holds?(Account.find(id), "case.read")
+      next if reached?(AUDIT_PATH) == may
+
+      leaked << "#{name} on #{AUDIT_PATH}: case.read=#{may}, got #{response.status}"
+    end
+    assert_empty leaked, leaked.join("\n")
+  end
+
+  test "the engine's own record inside the audit is access.read, on its own" do
+    entry = Fd::AuditEntry.create!(occurred_at: 1.hour.ago, actor_user_id: "USWEEPBOSS",
+      actor_kind: "human", entity_type: "case", entity_id: 9_001, verb: "resolved",
+      after: { "resolution" => "warned" }, source_app: "fire_engine")
+
     leaked = []
     PERSONAS.each_key do |name|
       id = become(name)
       may = Authz.holds?(Account.find(id), "access.read")
-      next if reached?(AUDIT_PATH) == may
+      next unless reached?("#{AUDIT_PATH}?view=everything")
 
-      leaked << "#{name} on #{AUDIT_PATH}: access.read=#{may}, got #{response.status}"
+      saw = response.body.include?("audit-verb") && response.body.include?("resolved")
+      leaked << "#{name}: access.read=#{may} but saw the engine record" if saw && !may
+
+      get "/fd/audit/event?source=fire_engine&id=#{entry.id}"
+      opened = response.status == 200
+      leaked << "#{name}: access.read=#{may} but opened the engine panel" if opened && !may
     end
     assert_empty leaked, leaked.join("\n")
   end

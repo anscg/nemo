@@ -41,6 +41,7 @@ module Fd
       turned_on turned_off
       tuned reset
       acked muted
+      exported
       queued cancelled
       read
     ].freeze

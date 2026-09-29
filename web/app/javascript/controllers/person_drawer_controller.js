@@ -34,7 +34,7 @@ export default class extends Controller {
   onClick(event) {
     if (this.element.matches(":empty")) return
     if (this.element.contains(event.target)) return
-    if (event.target.closest('[data-turbo-frame="person-drawer"]')) return
+    if (event.target.closest(`[data-turbo-frame="${this.element.id}"]`)) return
 
     this.close()
   }

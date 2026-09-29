@@ -145,6 +145,67 @@ module FdHelper
     "#{((part.to_f / whole) * 100).round(1)}% of the workspace"
   end
 
+  AUDIT_SOURCE = { "fire_engine" => "Fire Engine", "slack" => "Slack",
+                   "read" => "Fire Engine" }.freeze
+
+  def audit_raw(row)
+    JSON.pretty_generate(row.raw || row.detail || {})
+  end
+
+  def audit_verb(row)
+    row.verb.to_s.tr("_", " ")
+  end
+
+  def audit_actor(row)
+    return member_link(row.actor_id) if row.actor_id.present?
+    return tag.span("nemo", class: "state") if row.actor_kind.to_s == "bot"
+
+    tag.span("nobody named", class: "state")
+  end
+
+  AUDIT_CHANNEL = /\A[CGD][A-Z0-9]{2,}\z/
+  AUDIT_MEMBER = /\A[UW][A-Z0-9]{2,}\z/
+
+  def audit_about(row)
+    return member_link(row.subject_id) if row.subject_id.present?
+
+    said = [row.entity_ref, row.entity_id].compact_blank
+    room = said.find { |one| one.match?(AUDIT_CHANNEL) }
+    return audit_channel(room) if room
+
+    who = said.find { |one| one.match?(AUDIT_MEMBER) }
+    return member_link(who) if who
+    return tag.span("#{row.entity_kind} #{row.entity_id}", class: "sub2") if row.entity_id.present?
+
+    tag.span(row.entity_kind.to_s.tr("_", " "), class: "sub2")
+  end
+
+  PRIVATE_CHANNEL = "#private-channel".freeze
+
+  def audit_channel(channel_id)
+    return tag.span(PRIVATE_CHANNEL, class: "sub2", title: channel_id) unless
+      channels.named?(channel_id)
+
+    link_to channel_label(channel_id), channel_path(channel_id), class: "lnk",
+      title: channel_id
+  end
+
+  def audit_where(row)
+    parts = [tag.span(AUDIT_SOURCE.fetch(row.source, row.source), class: "state")]
+    parts << tag.span(row.ip, class: "mono audit-ip") if row.ip.present?
+    parts << tag.span(row.app_name, class: "sub2") if row.app_name.present?
+    safe_join(parts, " ")
+  end
+
+  AUDIT_VALUE = 80
+
+  def audit_value(value)
+    return tag.span("nothing", class: "sub2") if value.nil? || value == ""
+
+    said = value.is_a?(String) ? value : value.to_json
+    tag.span(said.truncate(AUDIT_VALUE), class: "mono")
+  end
+
   def session_span(first_at, last_at)
     return "n/a" if first_at.nil? || last_at.nil?
     return on_day(last_at) if first_at.to_date == last_at.to_date
