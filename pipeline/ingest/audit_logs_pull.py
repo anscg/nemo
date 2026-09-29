@@ -246,9 +246,9 @@ def land(conn, entries, source_key, ours, counts):
 def walk(client, conn, source_key, counts, oldest=None, latest=None, actions=None,
          start_cursor=None, on_cursor=None):
     asked = {}
-    if oldest is not None and not start_cursor:
+    if oldest is not None:
         asked["oldest"] = int(oldest.timestamp())
-    if latest is not None and not start_cursor:
+    if latest is not None:
         asked["latest"] = int(latest.timestamp())
     held = usable(actions)
     if actions and not held:
@@ -306,6 +306,24 @@ def watermark(conn):
     return row[0] if row and row[0] else None
 
 
+WINDOW_MARK = "|"
+
+
+def keep_place(conn, source_key, oldest, cursor):
+    if not cursor:
+        save_cursor(conn, source_key, "")
+        return
+    save_cursor(conn, source_key, f"{int(oldest.timestamp())}{WINDOW_MARK}{cursor}")
+
+
+def held_place(conn, source_key):
+    said = get_cursor(conn, source_key) or ""
+    mark, _, cursor = said.partition(WINDOW_MARK)
+    if not cursor or not mark.isdigit():
+        return None, None
+    return cursor, datetime.fromtimestamp(int(mark), tz=UTC)
+
+
 def drop_cursor(conn, source_key):
     save_cursor(conn, source_key, "")
     conn.commit()
@@ -313,16 +331,20 @@ def drop_cursor(conn, source_key):
 
 def tail(conn, client=None):
     client = client or ProxyClient.for_source(TAIL)
-    since = watermark(conn) or datetime.now(UTC) - timedelta(hours=FIRST_TAIL_HOURS)
-    oldest = since - timedelta(seconds=LAP_SECONDS)
-    held = get_cursor(conn, TAIL)
+    held, window = held_place(conn, TAIL)
+
+    if held:
+        oldest = window
+    else:
+        since = watermark(conn) or datetime.now(UTC) - timedelta(hours=FIRST_TAIL_HOURS)
+        oldest = since - timedelta(seconds=LAP_SECONDS)
 
     try:
         with ingest_run(conn, TAIL) as counts:
             landed, seated = walk(
                 client, conn, TAIL, counts, oldest=oldest, actions=tail_actions(),
                 start_cursor=held,
-                on_cursor=lambda cursor: save_cursor(conn, TAIL, cursor or ""),
+                on_cursor=lambda cursor: keep_place(conn, TAIL, oldest, cursor),
             )
             save_cursor(conn, TAIL, "")
     except ProxyError as failure:

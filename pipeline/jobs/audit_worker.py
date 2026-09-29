@@ -51,11 +51,11 @@ def refused(failure):
 
 
 LANES = (
-    ("tail", walk_tail, "AUDIT_TAIL_SECONDS", DEFAULT_TAIL_SECONDS),
-    ("backfill", walk_backfill, "AUDIT_BACKFILL_SECONDS", DEFAULT_BACKFILL_SECONDS),
-    ("access", walk_access_logs, "AUDIT_ACCESS_SECONDS", DEFAULT_ACCESS_SECONDS),
-    ("cohorts", refresh_cohorts, "AUDIT_COHORT_SECONDS", DEFAULT_COHORT_SECONDS),
-    ("links", refresh_links, "AUDIT_LINK_SECONDS", DEFAULT_LINK_SECONDS),
+    ("tail", walk_tail, "AUDIT_TAIL_SECONDS", DEFAULT_TAIL_SECONDS, True),
+    ("backfill", walk_backfill, "AUDIT_BACKFILL_SECONDS", DEFAULT_BACKFILL_SECONDS, True),
+    ("access", walk_access_logs, "AUDIT_ACCESS_SECONDS", DEFAULT_ACCESS_SECONDS, True),
+    ("cohorts", refresh_cohorts, "AUDIT_COHORT_SECONDS", DEFAULT_COHORT_SECONDS, False),
+    ("links", refresh_links, "AUDIT_LINK_SECONDS", DEFAULT_LINK_SECONDS, False),
 )
 
 OPTIONAL = ("backfill",)
@@ -65,7 +65,7 @@ def note(state):
     return ", ".join(f"{name} {state[name]}" for name, *_ in LANES)
 
 
-def lane(name, work, state, stopping, poll):
+def lane(name, work, state, stopping, poll, drains=True):
     def loop():
         while not stopping.is_set():
             moved = 0
@@ -88,7 +88,7 @@ def lane(name, work, state, stopping, poll):
             except Exception as failure:  # noqa: BLE001
                 state[name] = f"failed, {type(failure).__name__}"
                 print(f"{WORKER}: the {name} lane failed, trying again after the poll: {failure}")
-            if stopping.wait(BUSY_POLL_SECONDS if moved else poll):
+            if stopping.wait(BUSY_POLL_SECONDS if moved and drains else poll):
                 return
         state[name] = "stopped"
 
@@ -137,8 +137,8 @@ def serve():
 
     print(f"{WORKER}: {len(lanes)} lane(s) running independently")
     with beating(WORKER, lambda: note(state)):
-        running = [lane(name, work, state, stopping, seconds(var, fallback))
-                   for name, work, var, fallback in lanes]
+        running = [lane(name, work, state, stopping, seconds(var, fallback), drains)
+                   for name, work, var, fallback, drains in lanes]
         stopping.wait()
         for thread in running:
             thread.join(timeout=JOIN_TIMEOUT)

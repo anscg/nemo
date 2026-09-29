@@ -219,7 +219,7 @@ def test_the_tail_laps_back_a_second_so_the_seam_cannot_drop_an_event():
     assert pull.LAP_SECONDS >= 1
 
 
-def test_a_cursor_is_resumed_on_its_own_because_it_already_holds_the_window():
+def test_the_window_always_bounds_the_walk_even_when_resuming():
     held = []
 
     class Client:
@@ -227,21 +227,43 @@ def test_a_cursor_is_resumed_on_its_own_because_it_already_holds_the_window():
             held.append((dict(asked), kwargs.get("start_cursor")))
             return []
 
-    pull.walk(Client(), Conn(), "k", Counts(), oldest=dt.datetime(2026, 9, 29, tzinfo=dt.UTC),
-              start_cursor="abc")
+    when = dt.datetime(2026, 9, 29, tzinfo=dt.UTC)
+    pull.walk(Client(), Conn(), "k", Counts(), oldest=when, start_cursor="abc")
+
     asked, cursor = held[0]
     assert cursor == "abc"
-    assert "oldest" not in asked, "a cursor and a window slack did not pair are refused"
+    assert asked["oldest"] == int(when.timestamp()), \
+        "slack pages newest first, so oldest is the stop; without it the walk never ends"
 
-    pull.walk(Client(), Conn(), "k", Counts(), oldest=dt.datetime(2026, 9, 29, tzinfo=dt.UTC))
-    assert "oldest" in held[1][0], "with no cursor the window is what bounds the walk"
+
+def test_a_resumed_walk_keeps_the_window_the_cursor_was_minted_for(monkeypatch):
+    saved = {}
+    monkeypatch.setattr(pull, "save_cursor",
+                        lambda _conn, _key, value: saved.update(value=value))
+
+    when = dt.datetime(2026, 9, 29, 12, tzinfo=dt.UTC)
+    pull.keep_place(Conn(), pull.TAIL, when, "abc")
+    assert saved["value"] == f"{int(when.timestamp())}|abc"
+
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: saved["value"])
+    cursor, window = pull.held_place(Conn(), pull.TAIL)
+    assert cursor == "abc"
+    assert window == when, "an interrupted walk resumes on its own window, not a fresh one"
+
+
+def test_a_cursor_with_no_window_is_not_resumed(monkeypatch):
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "bare-cursor-no-mark")
+    assert pull.held_place(Conn(), pull.TAIL) == (None, None)
+
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "")
+    assert pull.held_place(Conn(), pull.TAIL) == (None, None)
 
 
 def test_a_cursor_slack_will_not_take_is_dropped_so_the_tail_can_recover(monkeypatch):
     import contextlib
 
     cleared = []
-    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "stale")
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "1790575062|stale")
     monkeypatch.setattr(pull, "save_cursor",
                         lambda _conn, key, value: cleared.append((key, value)))
     monkeypatch.setattr(pull, "watermark", lambda _conn: None)
@@ -267,7 +289,7 @@ def test_a_failure_that_is_not_a_refusal_leaves_the_cursor_where_it_was(monkeypa
     import contextlib
 
     cleared = []
-    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "good")
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "1790575062|good")
     monkeypatch.setattr(pull, "save_cursor",
                         lambda _conn, key, value: cleared.append((key, value)))
     monkeypatch.setattr(pull, "watermark", lambda _conn: None)
