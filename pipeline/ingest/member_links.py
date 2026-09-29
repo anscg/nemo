@@ -15,11 +15,19 @@ JOINED_TOGETHER = "joined_together"
 EVIDENCE = {
     IP_EXACT: """
         SELECT user_id, host(ip) AS value, min(at) AS first_seen, max(at) AS last_seen
-        FROM fd.login_event WHERE ip IS NOT NULL GROUP BY 1, 2
+        FROM fd.login_event e
+        WHERE ip IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM shared_ip s WHERE s.ip = e.ip)
+        GROUP BY 1, 2
+        HAVING count(*) >= {sightings}
     """,
     IP_PREFIX: """
         SELECT user_id, host(ip_prefix) AS value, min(at) AS first_seen, max(at) AS last_seen
-        FROM fd.login_event WHERE ip_prefix IS NOT NULL GROUP BY 1, 2
+        FROM fd.login_event e
+        WHERE ip_prefix IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM shared_ip s WHERE s.ip = e.ip)
+        GROUP BY 1, 2
+        HAVING count(*) >= {sightings}
     """,
     EMAIL_DOMAIN: """
         SELECT user_id, lower(split_part(email, '@', 2)) AS value,
@@ -93,6 +101,28 @@ JOIN small b ON b.bucket = a.bucket AND b.user_id > a.user_id
 JOIN keep k ON k.bucket = a.bucket
 """
 
+SHARED_ISP = """
+CREATE TEMP TABLE shared_isp ON COMMIT DROP AS
+SELECT isp,
+       count(DISTINCT ip)::numeric / greatest(count(DISTINCT user_id), 1) AS ips_each,
+       count(DISTINCT user_id) AS people
+FROM fd.login_event
+WHERE isp IS NOT NULL
+GROUP BY isp
+HAVING count(DISTINCT ip)::numeric / greatest(count(DISTINCT user_id), 1) >= %(rotates)s
+    OR count(DISTINCT user_id) >= %(crowds)s
+"""
+
+SHARED_IP = """
+CREATE TEMP TABLE shared_ip ON COMMIT DROP AS
+SELECT DISTINCT e.ip
+FROM fd.login_event e
+JOIN shared_isp s ON s.isp = e.isp
+WHERE e.ip IS NOT NULL
+"""
+
+SHARED_INDEX = "CREATE INDEX ON shared_ip (ip)"
+
 RARITY = """
 CREATE OR REPLACE FUNCTION pg_temp.rarity(whole numeric, crowd numeric)
 RETURNS numeric AS $$
@@ -160,9 +190,24 @@ def corroborating(held=None):
     return [name for name, one in signals(held).items() if one.get("corroborating")]
 
 
+def shared(held=None):
+    return (held or catalogue()).get("shared_networks", {})
+
+
+def mark_shared(conn, held):
+    settings = shared(held)
+    conn.execute(SHARED_ISP, {"rotates": settings.get("rotates_above", 5.0),
+                              "crowds": settings.get("crowds_above", 40)})
+    conn.execute(SHARED_IP)
+    conn.execute(SHARED_INDEX)
+    row = conn.execute("SELECT count(*) FROM shared_ip").fetchone()
+    return row[0] if row else 0
+
+
 def gather(conn, held):
     conn.execute(RARITY)
     conn.execute(STAGE)
+    sightings = int(shared(held).get("min_sightings", 1))
     counted = {}
 
     for name, settings in signals(held).items():
@@ -174,7 +219,7 @@ def gather(conn, held):
             source = EVIDENCE.get(name)
             if source is None:
                 continue
-            sql = PAIRS_SQL.format(evidence=source)
+            sql = PAIRS_SQL.format(evidence=source.format(sightings=sightings))
             args = {"weight": settings["weight"], "ceiling": settings["crowd_ceiling"]}
 
         with conn.cursor() as cur:
@@ -198,6 +243,7 @@ def run(conn):
 
     with ingest_run(conn, SOURCE) as counts:
         started = conn.execute("SELECT now()").fetchone()[0]
+        put_aside = mark_shared(conn, held)
         found = gather(conn, held)
         with conn.cursor() as cur:
             cur.execute(LAND, {"floor": marks["floor"],
@@ -208,5 +254,6 @@ def run(conn):
         conn.commit()
 
     said = ", ".join(f"{name} {n}" for name, n in sorted(found.items()) if n)
-    print(f"{SOURCE}: {counts.rows_in} link(s) kept, {gone} dropped ({said})")
+    print(f"{SOURCE}: {counts.rows_in} link(s) kept, {gone} dropped, "
+          f"{put_aside} address(es) on shared networks left out ({said})")
     return counts.rows_in

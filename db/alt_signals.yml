@@ -1,3 +1,8 @@
+shared_networks:
+  rotates_above: 5.0
+  crowds_above: 40
+  min_sightings: 2
+
 signals:
   ip_exact:
     label: Signed in from the same address
@@ -32,7 +37,7 @@ signals:
     crowd_ceiling: 25
 
 scoring:
-  floor: 2.0
+  floor: 3.0
   strong: 5.0
   certain: 8.0
   most_per_member: 25

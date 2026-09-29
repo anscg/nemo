@@ -102,6 +102,42 @@ def test_neither_side_of_the_join_reads_the_unpruned_evidence():
         assert "JOIN ev b" not in sql
 
 
+def test_a_network_many_people_share_is_not_evidence_of_anything():
+    held = links.shared()
+    assert held["rotates_above"] > 1, "a carrier hands each person a fresh address every time"
+    assert held["crowds_above"] > 1, "a vpn exit is one address behind which anybody can stand"
+    assert held["min_sightings"] >= 2, "one sighting on an address is a coincidence, not a home"
+
+
+def test_the_shared_networks_are_worked_out_rather_than_listed_by_hand():
+    assert "count(DISTINCT ip)" in links.SHARED_ISP
+    assert "count(DISTINCT user_id)" in links.SHARED_ISP
+    assert "rotates" in links.SHARED_ISP and "crowds" in links.SHARED_ISP
+    for named in ("T-Mobile", "ProtonVPN", "Jio"):
+        assert named not in links.SHARED_ISP, "no isp is named in the code"
+
+
+def test_an_address_on_a_shared_network_never_reaches_the_evidence():
+    for name in (links.IP_EXACT, links.IP_PREFIX):
+        assert "NOT EXISTS (SELECT 1 FROM shared_ip" in links.EVIDENCE[name]
+
+
+def test_an_address_seen_once_is_not_enough_to_call_it_theirs():
+    for name in (links.IP_EXACT, links.IP_PREFIX):
+        assert "HAVING count(*) >= {sightings}" in links.EVIDENCE[name]
+
+
+def test_the_floor_clears_a_single_weak_signal():
+    marks = links.scoring()
+    assert marks["floor"] > links.signals()["ip_prefix"]["weight"] * 0.9, \
+        "a shared /24 on its own must not be enough to link two people"
+
+
+def test_the_shared_tables_are_gone_when_the_pass_commits():
+    assert "ON COMMIT DROP" in links.SHARED_ISP
+    assert "ON COMMIT DROP" in links.SHARED_IP
+
+
 def test_every_signal_the_catalogue_names_can_actually_be_gathered():
     known = set(links.EVIDENCE) | {links.JOINED_TOGETHER}
     assert set(links.signals()) <= known
