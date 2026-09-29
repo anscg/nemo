@@ -108,8 +108,10 @@ ROLES = {
     "audit": {
         "required": DATABASE + ["INTERNAL_PROXY_URL", "INTERNAL_PROXY_TOKEN"],
         "optional": PIPELINE_ROLE + [
+            "AUDIT_ACCESS_SECONDS",
             "AUDIT_BACKFILL",
             "AUDIT_BACKFILL_SECONDS",
+            "AUDIT_COHORT_SECONDS",
             "AUDIT_HORIZON_DAYS",
             "AUDIT_NEMO_ID",
             "AUDIT_TAIL_ACTIONS",
@@ -190,6 +192,8 @@ DEFAULTS = {
     "ARCHIVE_POLL_SECONDS": "300",
     "AUDIT_TAIL_SECONDS": "60",
     "AUDIT_BACKFILL_SECONDS": "120",
+    "AUDIT_ACCESS_SECONDS": "3600",
+    "AUDIT_COHORT_SECONDS": "900",
     "AUDIT_HORIZON_DAYS": "90",
     "SYNC_POLL_SECONDS": "60",
     "SEED_SCALE": "dev",

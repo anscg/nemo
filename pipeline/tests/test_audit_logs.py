@@ -1,4 +1,5 @@
 import datetime as dt
+import pathlib
 
 import pytest
 
@@ -64,10 +65,9 @@ def test_a_login_carries_the_address_the_agent_and_the_session():
     assert row[0] == WHO
     assert row[2] == "user_login"
     assert row[3] == "157.51.215.171"
-    assert row[4] == "157.51.215.171/24"
-    assert row[6] == "Chrome 141"
-    assert row[7] == "Windows 10 or 11"
-    assert row[8] == 12177102026566
+    assert row[5] == "Chrome 141"
+    assert row[6] == "Windows 10 or 11"
+    assert row[7] == 12177102026566
 
 
 def test_only_the_actions_that_seat_somebody_make_a_login():
@@ -84,14 +84,16 @@ def test_a_login_with_nobody_behind_it_is_not_written_down():
 
 def test_a_session_that_is_not_a_number_does_not_stop_the_row():
     row = pull.login_row(entry(context={"session_id": "nonsense", "ip_address": "1.2.3.4"}))
-    assert row[8] is None
+    assert row[7] is None
     assert row[3] == "1.2.3.4"
 
 
-def test_an_ipv6_address_is_held_by_its_own_prefix():
-    assert pull.prefix_of("2a00:1450:4009:81f::200e") == "2a00:1450:4009:81f::200e/64"
-    assert pull.prefix_of("1.2.3.4") == "1.2.3.4/24"
-    assert pull.prefix_of(None) is None
+def test_the_prefix_is_the_database_s_job_so_two_hosts_on_one_range_group():
+    said = (pathlib.Path(__file__).parents[2] / "db" / "migrations"
+            / "0144_login_prefix_is_the_network.sql").read_text()
+    assert "GENERATED ALWAYS AS" in said
+    assert "network(set_masklen(ip" in said
+    assert "ip_prefix" not in pull.LOGIN_SQL, "the prefix must not be written by hand"
 
 
 def test_the_tail_asks_for_everything_unless_it_is_told_to_narrow(monkeypatch):

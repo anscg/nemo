@@ -292,6 +292,35 @@ sources:
     writes: [slack.audit_event, fd.login_event]
     feeds: []
 
+  access_logs:
+    unit_budget_seconds: 180
+    standalone: true
+    label: Where each member signed in from, with the network behind it
+    endpoint: team.accessLogs
+    documented: true
+    credential: admin
+    cadence: live
+    window: all time
+    guard: cursor end
+    resume: cursor
+    retention: keep
+    writes: [fd.login_event]
+    feeds: []
+
+  ip_cohorts:
+    standalone: true
+    label: How many people share each address, so one shared one is not a signal
+    endpoint: none
+    documented: true
+    credential: none
+    cadence: live
+    window: all time
+    guard: none
+    resume: none
+    retention: replace
+    writes: [fd.ip_cohort]
+    feeds: []
+
   prune:
     label: Drop rows past their retention window
     endpoint: none

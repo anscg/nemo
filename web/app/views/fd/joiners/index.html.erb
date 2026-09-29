@@ -40,11 +40,12 @@
           <table class="data-table cols-fixed">
             <colgroup>
               <% if may_deactivate %><col style="width: 40px"><% end %>
-              <col style="width: <%= @query.identity? ? "30%" : "48%" %>">
+              <col style="width: <%= @query.identity? ? "24%" : "48%" %>">
               <col style="width: 18%">
               <% if @query.identity? %>
-                <col style="width: 28%">
-                <col style="width: 10%">
+                <col style="width: 22%">
+                <col style="width: 8%">
+                <col style="width: 18%">
               <% end %>
               <col style="width: 16%">
             </colgroup>
@@ -63,6 +64,7 @@
                 <% if @query.identity? %>
                   <%= joiner_sort_header("Email", "domain") %>
                   <th class="col-num">On domain</th>
+                  <th>Last seen from</th>
                 <% end %>
                 <th class="col-num">Standing</th>
               </tr>
@@ -121,6 +123,9 @@
                     </td>
                     <td class="col-num <%= "is-none" if row.domain.blank? %>">
                       <%= row.domain.present? ? number_with_delimiter(row.domain_people) : "n/a" %>
+                    </td>
+                    <td class="<%= "is-none" if row.seen_from.blank? %>">
+                      <%= joiner_seen(row) %>
                     </td>
                   <% end %>
                   <td class="col-num"><%= joiner_standing(row) %></td>

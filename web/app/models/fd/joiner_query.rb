@@ -7,7 +7,7 @@ module Fd
     View = Struct.new(:key, :label, :count, :current, keyword_init: true)
     Row = Struct.new(:user_id, :joined_at, :source, :nearest_join, :handle, :display_name,
       :avatar_hash, :email, :domain, :domain_people, :in_force, :kinds, :deactivated,
-      keyword_init: true) do
+      :seen_app, :seen_country, :seen_people, keyword_init: true) do
       def burst? = nearest_join.present? && nearest_join <= BURST_SECONDS
 
       def deactivated? = deactivated
@@ -15,9 +15,18 @@ module Fd
       def guarded? = in_force.to_i.positive?
 
       def lone_domain? = domain.present? && domain_people.to_i <= 1
+
+      def seen_from
+        [seen_app, seen_country].compact_blank.join(" \u00b7 ").presence
+      end
+
+      def crowded? = seen_people.to_i >= CROWDED
+
+      def close_company? = seen_people.to_i.between?(2, CROWDED - 1)
     end
 
     BURST_SECONDS = 120
+    CROWDED = 20
     LIMIT = 50
     MIN_TERM = 2
 
@@ -278,6 +287,23 @@ module Fd
         ON mi.user_id = j.user_id AND mi.purged_at IS NULL
     SQL
 
+    SEEN_COLUMNS =
+      ", seen.ua_app AS seen_app, seen.country AS seen_country, " \
+      "coalesce(cohort.people, 0) AS seen_people".freeze
+    BLIND_SEEN =
+      ", NULL::text AS seen_app, NULL::text AS seen_country, 0 AS seen_people".freeze
+
+    SEEN_JOIN = <<~SQL.freeze
+      LEFT JOIN LATERAL (
+        SELECT l.ua_app, l.country, l.ip_prefix
+        FROM fd.login_event l
+        WHERE l.user_id = j.user_id
+        ORDER BY l.at DESC
+        LIMIT 1
+      ) seen ON true
+      LEFT JOIN fd.ip_cohort cohort ON cohort.ip_prefix = seen.ip_prefix
+    SQL
+
     DOMAIN_TALLY = <<~SQL.freeze
       , domains AS (
         SELECT lower(split_part(email, '@', 2)) AS domain, count(*) AS people
@@ -316,10 +342,12 @@ module Fd
                    WHERE g.subject_id = j.user_id AND g.kind = 'deactivation'
                      AND g.state IN ('live', 'lifting')
                  ) AS deactivated
+                 #{identity? ? SEEN_COLUMNS : BLIND_SEEN}
           FROM joined j
           JOIN fd.member m ON m.user_id = j.user_id AND NOT m.is_bot
           #{identity? ? IDENTITY_JOIN : ''}
           #{identity? ? 'LEFT JOIN domains d ON d.domain = lower(split_part(mi.email, \'@\', 2))' : ''}
+          #{identity? ? SEEN_JOIN : ''}
         )
         SELECT #{columns} FROM picked WHERE #{where}
       SQL
@@ -395,7 +423,9 @@ module Fd
         display_name: row["display_name"], avatar_hash: row["avatar_hash"],
         email: row["email"], domain: row["domain"],
         domain_people: row["domain_people"].to_i, in_force: row["in_force"].to_i,
-        kinds: row["kinds"].to_s.split(","), deactivated: row["deactivated"]
+        kinds: row["kinds"].to_s.split(","), deactivated: row["deactivated"],
+        seen_app: row["seen_app"], seen_country: row["seen_country"],
+        seen_people: row["seen_people"].to_i
       )
     end
 

@@ -4,8 +4,10 @@ import threading
 
 from dotenv import load_dotenv
 
+from ingest.access_logs_pull import run as walk_access_logs
 from ingest.audit_logs_pull import backfill as walk_backfill
 from ingest.audit_logs_pull import tail as walk_tail
+from ingest.ip_cohorts import run as refresh_cohorts
 from lib.db import (
     AlreadyRunning,
     SeededDeployment,
@@ -24,6 +26,8 @@ from lib.proxy_client import ProxyError
 WORKER = "audit_worker"
 DEFAULT_TAIL_SECONDS = 60
 DEFAULT_BACKFILL_SECONDS = 120
+DEFAULT_ACCESS_SECONDS = 3600
+DEFAULT_COHORT_SECONDS = 900
 JOIN_TIMEOUT = 10
 BUSY_POLL_SECONDS = 2
 REFUSED_BACKOFF_SECONDS = 900
@@ -47,7 +51,11 @@ def refused(failure):
 LANES = (
     ("tail", walk_tail, "AUDIT_TAIL_SECONDS", DEFAULT_TAIL_SECONDS),
     ("backfill", walk_backfill, "AUDIT_BACKFILL_SECONDS", DEFAULT_BACKFILL_SECONDS),
+    ("access", walk_access_logs, "AUDIT_ACCESS_SECONDS", DEFAULT_ACCESS_SECONDS),
+    ("cohorts", refresh_cohorts, "AUDIT_COHORT_SECONDS", DEFAULT_COHORT_SECONDS),
 )
+
+OPTIONAL = ("backfill",)
 
 
 def note(state):
@@ -100,8 +108,8 @@ def main():
 def wanted_lanes():
     if backfill_wanted():
         return LANES
-    print(f"{WORKER}: AUDIT_BACKFILL is off, only the tail lane will run")
-    return LANES[:1]
+    print(f"{WORKER}: AUDIT_BACKFILL is off, the backfill lane will not run")
+    return tuple(one for one in LANES if one[0] not in OPTIONAL)
 
 
 def serve():

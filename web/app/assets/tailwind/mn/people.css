@@ -699,3 +699,68 @@
   }
   .pickbar-count b { font-size: var(--t-body); color: var(--ink); font-variant-numeric: tabular-nums; }
 }
+
+@layer components {
+  .sessions { display: flex; flex-direction: column; gap: var(--s-xs); }
+
+  .sessions-lede {
+    font-size: var(--t-small);
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+
+  .session {
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
+    overflow: clip;
+  }
+
+  .session-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2xs);
+    flex-wrap: wrap;
+    padding: 7px var(--s-xs);
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--sunk);
+  }
+  .session-name {
+    font-size: var(--t-body);
+    font-weight: 550;
+    color: var(--ink);
+  }
+  .session-meta { font-size: var(--t-small); color: var(--ink-3); }
+
+  .session-where {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    column-gap: var(--s-2xs);
+    row-gap: 2px;
+    padding: 7px var(--s-xs);
+  }
+  .session-where + .session-where { border-top: 1px solid var(--line-soft); }
+
+  .session-ip {
+    font-size: var(--t-small);
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .session-where > .state { justify-self: end; }
+  .session-net,
+  .session-alongside,
+  .session-crowd {
+    grid-column: 1 / -1;
+    font-size: var(--t-small);
+    color: var(--ink-3);
+    line-height: 1.45;
+  }
+  .session-alongside { color: var(--crit); }
+  .session-alongside a { color: inherit; }
+  .session-crowd { font-style: italic; }
+  .session-none {
+    padding: 7px var(--s-xs);
+    font-size: var(--t-small);
+    color: var(--ink-3);
+  }
+}

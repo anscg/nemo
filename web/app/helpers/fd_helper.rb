@@ -145,6 +145,32 @@ module FdHelper
     "#{((part.to_f / whole) * 100).round(1)}% of the workspace"
   end
 
+  def session_span(first_at, last_at)
+    return "n/a" if first_at.nil? || last_at.nil?
+    return on_day(last_at) if first_at.to_date == last_at.to_date
+
+    "#{first_at.strftime('%-d %b')} \u2013 #{on_day(last_at)}"
+  end
+
+  def session_swatch(address)
+    return tag.span("shared", class: "state state-crit") if address.alongside.any?
+    return tag.span("crowded", class: "state") if address.crowded?
+    return tag.span("shared", class: "state state-warn") if address.shared?
+
+    tag.span("theirs alone", class: "state state-good")
+  end
+
+  def joiner_seen(row)
+    return "no sign-in on file" if row.seen_from.blank?
+
+    safe_join([
+      tag.span(row.seen_from),
+      (if row.close_company?
+         tag.span("#{row.seen_people - 1} others here", class: "state state-warn")
+       end)
+    ].compact, " ")
+  end
+
   def joiner_sort_header(label, key, numeric: false)
     css = ["th-sort"]
     css << "col-num" if numeric

@@ -43,11 +43,10 @@ ON CONFLICT (id) DO NOTHING
 
 LOGIN_SQL = """
 INSERT INTO fd.login_event
-    (user_id, at, source, action, ip, ip_prefix, ua, ua_app, ua_os, session_id)
-VALUES (%s, %s, 'audit_logs', %s, %s, %s, %s, %s, %s, %s)
+    (user_id, at, source, action, ip, ua, ua_app, ua_os, session_id)
+VALUES (%s, %s, 'audit_logs', %s, %s, %s, %s, %s, %s)
 ON CONFLICT (user_id, at, source) DO UPDATE SET
     ip = coalesce(EXCLUDED.ip, fd.login_event.ip),
-    ip_prefix = coalesce(EXCLUDED.ip_prefix, fd.login_event.ip_prefix),
     ua = coalesce(EXCLUDED.ua, fd.login_event.ua),
     ua_app = coalesce(EXCLUDED.ua_app, fd.login_event.ua_app),
     ua_os = coalesce(EXCLUDED.ua_os, fd.login_event.ua_os),
@@ -114,12 +113,6 @@ def event_row(entry, source_key, ours):
     )
 
 
-def prefix_of(ip):
-    if not ip:
-        return None
-    return f"{ip}/24" if ":" not in ip else f"{ip}/64"
-
-
 def login_row(entry):
     if entry.get("action") not in SEATED:
         return None
@@ -135,7 +128,7 @@ def login_row(entry):
     session = context.get("session_id")
 
     return (
-        user_id, at, entry["action"], ip, prefix_of(ip),
+        user_id, at, entry["action"], ip,
         seen["ua"], seen["ua_app"], seen["ua_os"],
         int(session) if str(session or "").isdigit() else None,
     )
