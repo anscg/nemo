@@ -371,6 +371,28 @@ ORDER BY g.expires_at
 """
 
 
+LIFTED_UNTOLD = """
+SELECT id, kind, subject_id, channel_id, reason, expires_at
+FROM fd.member_guards g
+WHERE g.state = 'lifted' AND g.carried_by = 'nemo'
+  AND g.lifted_at > now() - %s::interval
+  AND NOT EXISTS (
+    SELECT 1 FROM fd.member_guard_events e
+    WHERE e.guard_id = g.id AND e.verb = 'released'
+  )
+ORDER BY g.lifted_at
+LIMIT 20
+"""
+
+RELEASED = "released"
+
+LIFTED_BY_HAND = "somebody lifted it"
+
+
+def lifted_untold(conn, within):
+    return [dict(zip(WANTED, row)) for row in conn.execute(LIFTED_UNTOLD, (within,)).fetchall()]
+
+
 def lapsed(conn):
     return [dict(zip(WANTED, row)) for row in conn.execute(LAPSED).fetchall()]
 

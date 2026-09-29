@@ -22,7 +22,7 @@ def arrived(ctx):
 
     email = ((user.get("profile") or {}).get("email"))
     with session() as conn:
-        screening.screen(conn, user["id"], email)
+        screening.screen(conn, user["id"], email, client=ctx.client)
     return user["id"]
 
 

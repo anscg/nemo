@@ -73,6 +73,25 @@ def sweep_lapsed(client):
     return len(due)
 
 
+LIFT_LOOKBACK = "2 hours"
+
+
+def sweep_lifted(client):
+    with session() as conn:
+        untold = memberguards.lifted_untold(conn, LIFT_LOOKBACK)
+
+    for guard in untold:
+        with session() as conn:
+            try:
+                memberguards.happened(conn, guard["id"], guard["subject_id"],
+                                      guard["channel_id"], memberguards.RELEASED,
+                                      detail=memberguards.LIFTED_BY_HAND)
+                release(client, conn, guard)
+            except Exception as failure:
+                log.warning("nemo: could not say that %s was lifted: %s", guard["id"], failure)
+    return len(untold)
+
+
 def sweep_lifting(client):
     with session() as conn:
         waiting = memberguards.still_lifting(conn)

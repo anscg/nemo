@@ -23,6 +23,13 @@ LANDED = {FLAG: FLAGGED, HOLD: HELD, DEACTIVATE: DEACTIVATED}
 
 SHUSH_DAYS = 7
 
+SAID = {
+    FLAGGED: "joined on {domain}, which is flagged",
+    HELD: "joined on {domain} and is shushed",
+    DEACTIVATED: "joined on {domain} and is deactivated",
+    FAILED: "joined on {domain} but nemo could not hold them",
+}
+
 LIVE = """
 SELECT id, domain, match_mode, effect
 FROM fd.blocked_domains
@@ -101,8 +108,29 @@ def record(conn, user_id, domain, found, outcome, guard_id=None, detail=None):
     )).fetchone()
 
 
-def screen(conn, user_id, email, by="nemo"):
-    """Decide what the domain list says about somebody who has just joined."""
+def tell_the_house(client, conn, user_id, domain, outcome):
+    if client is None or outcome not in SAID:
+        return None
+
+    from bot.nemo import channel
+
+    room = channel.firehouse_channel(conn)
+    if not room:
+        return None
+
+    try:
+        client.chat_postMessage(
+            channel=room,
+            text=f"<@{user_id}> {SAID[outcome].format(domain=domain)}.",
+            unfurl_links=False,
+        )
+    except Exception as failure:  # noqa: BLE001
+        log.warning("nemo: could not say that %s was screened: %s", user_id, failure)
+        return None
+    return room
+
+
+def screen(conn, user_id, email, by="nemo", client=None):
     domain = domain_of(email)
     if domain is None:
         record(conn, user_id, None, None, NO_EMAIL)
@@ -116,6 +144,7 @@ def screen(conn, user_id, email, by="nemo"):
     if found.effect == FLAG:
         record(conn, user_id, domain, found, FLAGGED)
         log.warning("nemo: %s joined on %s, which is flagged", user_id, domain)
+        tell_the_house(client, conn, user_id, domain, FLAGGED)
         return FLAGGED, None
 
     guard_id, trouble = hold_them(conn, user_id, found, by)
@@ -123,11 +152,13 @@ def screen(conn, user_id, email, by="nemo"):
         record(conn, user_id, domain, found, FAILED, detail=trouble)
         log.warning("nemo: %s joined on %s but the guard would not open: %s",
                     user_id, domain, trouble)
+        tell_the_house(client, conn, user_id, domain, FAILED)
         return FAILED, None
 
     outcome = LANDED[found.effect]
     record(conn, user_id, domain, found, outcome, guard_id=guard_id)
     log.warning("nemo: %s joined on %s, %s", user_id, domain, outcome)
+    tell_the_house(client, conn, user_id, domain, outcome)
     return outcome, guard_id
 
 
@@ -142,7 +173,7 @@ def hold_them(conn, user_id, found, by):
         guard_id = memberguards.open_guard(
             conn, kind, user_id, by, reason, expires_at=expires
         )
-    except Exception as failure:  # noqa: BLE001 - a bad guard must not lose the screen row
+    except Exception as failure:  # noqa: BLE001
         return None, str(failure)[:500]
 
     if guard_id is None:

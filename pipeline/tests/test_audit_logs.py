@@ -114,7 +114,6 @@ def test_no_more_actions_are_asked_for_than_slack_will_take(monkeypatch):
 
 
 class Refusing:
-    """a proxy that will not take one action, the way slack will not take message_deleted"""
 
     def __init__(self, bad="message_deleted"):
         self.bad = bad
@@ -198,8 +197,22 @@ def test_a_slice_covers_one_whole_day_in_utc():
 
 def test_the_action_set_is_part_of_the_coverage_key_so_a_window_cannot_lie():
     assert pull.source_key_for(pull.LOGIN_ACTIONS).endswith(":logins")
+    assert pull.source_key_for(pull.CHANNEL_ACTIONS).endswith(":channels")
+    assert pull.source_key_for(pull.WATCHED_ACTIONS).endswith(":watched")
     assert pull.source_key_for(None).endswith(":all")
-    assert pull.source_key_for(pull.LOGIN_ACTIONS) != pull.source_key_for(None)
+
+    keys = {pull.source_key_for(one) for one in
+            (pull.LOGIN_ACTIONS, pull.CHANNEL_ACTIONS, pull.WATCHED_ACTIONS, None)}
+    assert len(keys) == 4, "a widened set must not inherit a narrower set's coverage"
+
+
+def test_the_backfill_walks_the_channel_actions_as_well_as_the_logins():
+    import inspect
+
+    said = inspect.signature(pull.backfill).parameters["actions"].default
+    assert said == pull.WATCHED_ACTIONS
+    assert set(pull.CHANNEL_ACTIONS) <= set(said)
+    assert len(said) <= pull.MOST_ACTIONS, "slack takes only so many actions in one call"
 
 
 def test_the_tail_laps_back_a_second_so_the_seam_cannot_drop_an_event():
@@ -250,6 +263,60 @@ def test_landing_writes_the_event_and_the_login_from_one_pass():
 def test_a_landed_event_is_never_written_twice():
     assert "ON CONFLICT (id) DO NOTHING" in pull.EVENT_SQL
     assert "ON CONFLICT (user_id, at, source) DO UPDATE" in pull.LOGIN_SQL
+    assert "ON CONFLICT (audit_id) DO NOTHING" in pull.CHANNEL_SQL
+
+
+ROOM = {"type": "channel", "channel": {"id": "C1", "name": "lounge", "privacy": "public"}}
+
+
+def joined(**over):
+    row = {"action": "user_channel_join", "entity": ROOM, "details": {"is_workflow": False}}
+    row.update(over)
+    return entry(**row)
+
+
+def test_a_room_somebody_walks_into_is_written_down_with_the_room_it_was():
+    row = pull.channel_row(joined())
+
+    assert row[2] == WHO
+    assert row[3] == "C1"
+    assert row[4] == "lounge"
+    assert row[5] == "public"
+    assert row[6] == pull.JOINED
+    assert row[7] is False
+
+
+def test_leaving_is_kept_apart_from_arriving():
+    assert pull.channel_row(joined(action="user_channel_leave"))[6] == pull.LEFT
+    assert pull.channel_row(joined(action="user_login")) is None
+
+
+def test_a_room_a_workflow_put_them_in_says_so_so_it_is_not_read_as_a_raid():
+    assert pull.channel_row(joined(details={"is_workflow": True}))[7] is True
+
+
+def test_a_join_missing_the_member_or_the_room_is_not_written_down():
+    assert pull.channel_row(joined(actor={})) is None
+    assert pull.channel_row(joined(entity={"type": "channel", "channel": {}})) is None
+    assert pull.channel_row(joined(entity={})) is None
+    assert pull.channel_row(joined(date_create=None)) is None
+
+
+def test_landing_projects_the_rooms_alongside_the_events():
+    conn, counts = Conn(), Counts()
+    pull.land(conn, [joined(), joined(id="b", action="user_channel_leave"), entry()],
+              "audit_logs_tail", frozenset(), counts)
+
+    rooms = conn.did("INSERT INTO fd.member_channel_join")[0]
+    assert len(rooms) == 2
+    assert {one[6] for one in rooms} == {pull.JOINED, pull.LEFT}
+
+
+def test_the_rooms_are_projected_org_wide_not_only_where_nemo_sits():
+    said = (pathlib.Path(__file__).parents[2] / "db" / "migrations"
+            / "0148_member_channel_joins.sql").read_text()
+    assert "FROM slack.audit_event" in said, "the history already landed must be projected too"
+    assert "member_channel_join_room_idx" in said, "fan-out is read by room and time"
 
 
 @pytest.mark.parametrize(("said", "app", "system"), [

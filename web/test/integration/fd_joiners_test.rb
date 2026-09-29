@@ -1,24 +1,18 @@
 require "test_helper"
 
 class FdJoinersTest < ActionDispatch::IntegrationTest
+  include SeedsPipelineTables
+
   setup do
     @me = hold_role!("UME", "community_manager")
   end
 
   def joined!(user_id, at:, source: "team_join", email: nil)
-    Fd::Member.upsert({ user_id: user_id, handle: user_id.downcase, is_bot: false,
-                        is_deleted: false }, unique_by: :user_id)
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.member_joins (user_id, joined_at, source) VALUES (?, ?, ?) " \
-      "ON CONFLICT (user_id) DO UPDATE SET joined_at = EXCLUDED.joined_at, " \
-      "source = EXCLUDED.source", user_id, at, source
-    ]))
-    return if email.nil?
-
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.member_identity (user_id, email) VALUES (?, ?) " \
-      "ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email", user_id, email
-    ]))
+    member!(user_id, email: email)
+    as_pipeline("INSERT INTO fd.member_joins (user_id, joined_at, source) VALUES (?, ?, ?) " \
+                "ON CONFLICT (user_id) DO UPDATE SET joined_at = EXCLUDED.joined_at, " \
+                "source = EXCLUDED.source", user_id, at, source)
+    seeded!("fd.member_joins", "user_id", user_id)
   end
 
   def query(params = {}, actor: @me)

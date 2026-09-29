@@ -30,6 +30,12 @@ LOGIN_ACTIONS = (
 LOGIN_SET = frozenset(LOGIN_ACTIONS)
 SEATED = frozenset({"user_login", "user_login_failed", "anomaly"})
 
+CHANNEL_ACTIONS = ("user_channel_join", "user_channel_leave")
+WATCHED_ACTIONS = LOGIN_ACTIONS + CHANNEL_ACTIONS
+JOINED = "joined"
+LEFT = "left"
+ROOMED = {"user_channel_join": JOINED, "user_channel_leave": LEFT}
+
 DEFAULT_HORIZON_DAYS = 90
 LAP_SECONDS = 1
 FIRST_TAIL_HOURS = 24
@@ -53,6 +59,13 @@ ON CONFLICT (user_id, at, source) DO UPDATE SET
     ua_os = coalesce(EXCLUDED.ua_os, fd.login_event.ua_os),
     session_id = coalesce(EXCLUDED.session_id, fd.login_event.session_id),
     updated_at = now()
+"""
+
+CHANNEL_SQL = """
+INSERT INTO fd.member_channel_join
+    (audit_id, at, user_id, channel_id, channel_name, privacy, verb, by_workflow)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (audit_id) DO NOTHING
 """
 
 WATERMARK_SQL = "SELECT max(at) FROM slack.audit_event"
@@ -95,7 +108,6 @@ def usable(actions):
 
 
 def find_refusals(client, actions):
-    """Slack lists actions it will not take, so ask about each one alone and remember."""
     found = []
     for one in actions:
         try:
@@ -123,6 +135,8 @@ def tail_actions():
         return None
     if said.lower() in ("login", "logins"):
         return LOGIN_ACTIONS
+    if said.lower() == "watched":
+        return WATCHED_ACTIONS
     return tuple(one.strip() for one in said.split(",") if one.strip())[:MOST_ACTIONS]
 
 
@@ -184,8 +198,25 @@ def login_row(entry):
     )
 
 
+def channel_row(entry):
+    verb = ROOMED.get(entry.get("action"))
+    if verb is None:
+        return None
+
+    _kind, user_id = whose(entry, "actor")
+    room = (entry.get("entity") or {}).get("channel") or {}
+    at = stamp(entry.get("date_create"))
+    if not entry.get("id") or not user_id or not room.get("id") or at is None:
+        return None
+
+    return (
+        entry["id"], at, user_id, room["id"], room.get("name"), room.get("privacy"),
+        verb, bool((entry.get("details") or {}).get("is_workflow")),
+    )
+
+
 def land(conn, entries, source_key, ours, counts):
-    events, logins = [], []
+    events, logins, rooms = [], [], []
     for entry in entries:
         row = event_row(entry, source_key, ours)
         if row is None:
@@ -196,12 +227,17 @@ def land(conn, entries, source_key, ours, counts):
         seated = login_row(entry)
         if seated:
             logins.append(seated)
+        roomed = channel_row(entry)
+        if roomed:
+            rooms.append(roomed)
 
     if events:
         with conn.cursor() as cur:
             cur.executemany(EVENT_SQL, events)
             if logins:
                 cur.executemany(LOGIN_SQL, logins)
+            if rooms:
+                cur.executemany(CHANNEL_SQL, rooms)
     conn.commit()
     counts.rows_in += len(events)
     return len(events), len(logins)
@@ -293,8 +329,22 @@ def slice_keys(days):
     return [today - timedelta(days=step) for step in range(days)]
 
 
+BACKFILL_SETS = (
+    (WATCHED_ACTIONS, "watched"),
+    (LOGIN_ACTIONS, "logins"),
+    (CHANNEL_ACTIONS, "channels"),
+)
+
+
 def source_key_for(actions):
-    return f"{BACKFILL}:logins" if actions else f"{BACKFILL}:all"
+    if not actions:
+        return f"{BACKFILL}:all"
+
+    held = tuple(actions)
+    for known, name in BACKFILL_SETS:
+        if held == known:
+            return f"{BACKFILL}:{name}"
+    return f"{BACKFILL}:picked"
 
 
 def next_slice(conn, source_key, days):
@@ -310,7 +360,7 @@ def bounds(day: date):
     return start, start + timedelta(days=1)
 
 
-def backfill(conn, client=None, actions=LOGIN_ACTIONS):
+def backfill(conn, client=None, actions=WATCHED_ACTIONS):
     client = client or ProxyClient.for_source(BACKFILL)
     source_key = source_key_for(actions)
     day = next_slice(conn, source_key, horizon_days())

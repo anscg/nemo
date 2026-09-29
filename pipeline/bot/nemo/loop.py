@@ -166,6 +166,7 @@ def once(desk, channel_id=None):
         ("resetting sessions the guard has earned", guardwork.sweep_strikes),
         ("lifting what has run out", lambda: sweep.sweep_lapsed(client)),
         ("finishing what is still lifting", lambda: sweep.sweep_lifting(client)),
+        ("saying what was lifted by hand", lambda: sweep.sweep_lifted(client)),
         ("taking up what it dropped", lambda: sweep.sweep_dropped(client)),
         ("saying what is ending soon", lambda: sweep.sweep_ending(client)),
     )

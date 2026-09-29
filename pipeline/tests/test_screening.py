@@ -51,6 +51,53 @@ def outcome_of(conn):
     return conn.did("INSERT INTO fd.join_screen")[0][5]
 
 
+class House:
+    def __init__(self):
+        self.posted = []
+
+    def chat_postMessage(self, **kwargs):
+        self.posted.append(kwargs)
+        return {"ts": "1.1"}
+
+
+def test_a_catch_is_said_in_the_firehouse(monkeypatch):
+    watching(watch(effect="flag"))
+    from bot.nemo import channel
+    monkeypatch.setattr(channel, "firehouse_channel", lambda _conn=None: "CHOUSE")
+    house = House()
+
+    screening.screen(Conn(), WHO, "kid@throwaway.example", client=house)
+
+    assert house.posted[0]["channel"] == "CHOUSE"
+    assert "throwaway.example" in house.posted[0]["text"]
+    assert WHO in house.posted[0]["text"]
+
+
+def test_somebody_the_list_lets_in_is_not_announced(monkeypatch):
+    watching(watch())
+    from bot.nemo import channel
+    monkeypatch.setattr(channel, "firehouse_channel", lambda _conn=None: "CHOUSE")
+    house = House()
+
+    screening.screen(Conn(), WHO, "kid@school.example", client=house)
+    assert house.posted == []
+
+
+def test_a_firehouse_that_will_not_take_it_does_not_lose_the_screen(monkeypatch):
+    watching(watch(effect="flag"))
+    from bot.nemo import channel
+    monkeypatch.setattr(channel, "firehouse_channel", lambda _conn=None: "CHOUSE")
+
+    class Refuses:
+        def chat_postMessage(self, **_kwargs):
+            raise RuntimeError("channel_not_found")
+
+    conn = Conn()
+    assert screening.screen(conn, WHO, "kid@throwaway.example",
+                            client=Refuses())[0] == screening.FLAGGED
+    assert outcome_of(conn) == screening.FLAGGED
+
+
 def test_an_address_is_read_down_to_its_domain():
     assert screening.domain_of("Kid@Throwaway.Example ") == "throwaway.example"
     assert screening.domain_of("kid@sub.school.example") == "sub.school.example"

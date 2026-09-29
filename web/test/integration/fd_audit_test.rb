@@ -1,6 +1,7 @@
 require "test_helper"
 
 class FdAuditTest < ActionDispatch::IntegrationTest
+  include SeedsPipelineTables
   WHO = "USUB".freeze
 
   setup do
@@ -16,14 +17,15 @@ class FdAuditTest < ActionDispatch::IntegrationTest
 
   def slack!(action: "user_login", actor: WHO, at: 1.hour.ago, ip: "81.2.69.144",
     id: SecureRandom.uuid, ours: false, email: nil)
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([<<~SQL.squish, id,
+    as_pipeline(<<~SQL.squish, id,
       INSERT INTO slack.audit_event (id, at, action, actor_kind, actor_id, entity_kind,
                                      entity_id, ours, context, payload, source_key)
       VALUES (?, ?, ?, 'user', ?, 'user', ?, ?, ?::jsonb, ?::jsonb, 'test')
     SQL
       at, action, actor, actor, ours, { ip_address: ip }.to_json,
       { id: id, action: action,
-        actor: { type: "user", user: { id: actor, email: email }.compact } }.to_json]))
+        actor: { type: "user", user: { id: actor, email: email }.compact } }.to_json)
+    seeded!("slack.audit_event", "id", id)
   end
 
   def query(params = {})
@@ -174,13 +176,7 @@ class FdAuditTest < ActionDispatch::IntegrationTest
   end
 
   test "an email reaches the person behind it" do
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.member (user_id) VALUES (?) ON CONFLICT DO NOTHING", WHO
-    ]))
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.member_identity (user_id, email) VALUES (?, ?) " \
-      "ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email", WHO, "kid@school.example"
-    ]))
+    member!(WHO, email: "kid@school.example")
     engine!(subject: WHO, verb: "performed")
     engine!(subject: "UOTHER", verb: "noted")
 
@@ -289,21 +285,24 @@ class FdAuditTest < ActionDispatch::IntegrationTest
   end
 
   def in_channel!(channel_id, action: "user_channel_join")
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([<<~SQL.squish,
+    id = SecureRandom.uuid
+    as_pipeline(<<~SQL.squish,
       INSERT INTO slack.audit_event (id, at, action, actor_kind, actor_id, entity_kind,
                                      entity_id, ours, context, payload, source_key)
       VALUES (?, now(), ?, 'user', ?, 'channel', ?, false, '{}'::jsonb, '{}'::jsonb, 'test')
     SQL
-      SecureRandom.uuid, action, WHO, channel_id]))
+      id, action, WHO, channel_id)
+    seeded!("slack.audit_event", "id", id)
   end
 
   def named_channel!(channel_id, name)
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([<<~SQL.squish,
+    as_pipeline(<<~SQL.squish,
       INSERT INTO raw.channel_dim (channel_id, name, visibility)
       VALUES (?, ?, 'public')
       ON CONFLICT (channel_id) DO UPDATE SET name = EXCLUDED.name
     SQL
-      channel_id, name]))
+      channel_id, name)
+    seeded!("raw.channel_dim", "channel_id", channel_id)
   end
 
   test "a channel we know is named and can be opened" do

@@ -6,13 +6,8 @@ class Fd::MemberIdentityTest < ActiveSupport::TestCase
   end
 
   test "the app holds no write grant on either member table" do
-    assert_raises(ActiveRecord::StatementInvalid) do
-      Fd::Member.insert!({ user_id: "USNEAK", display_name: "Sneak" })
-    end
-
-    assert_raises(ActiveRecord::StatementInvalid) do
-      Fd::MemberIdentity.insert!({ user_id: "USNEAK", email: "sneak@example.invalid" })
-    end
+    assert_read_only! "fd.member"
+    assert_read_only! "fd.member_identity"
   end
 
   test "a loaded member row is readonly, so nothing can save one by accident" do

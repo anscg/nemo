@@ -82,7 +82,7 @@ def lane(name, work, state, stopping, poll):
                     continue
                 state[name] = f"failed, {type(failure).__name__}"
                 print(f"{WORKER}: the {name} lane failed: {failure}")
-            except Exception as failure:  # noqa: BLE001 - a lane must outlive one bad pass
+            except Exception as failure:  # noqa: BLE001
                 state[name] = f"failed, {type(failure).__name__}"
                 print(f"{WORKER}: the {name} lane failed, trying again after the poll: {failure}")
             if stopping.wait(BUSY_POLL_SECONDS if moved else poll):

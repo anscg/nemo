@@ -1,6 +1,8 @@
 require "test_helper"
 
 class FdBlockedDomainsTest < ActionDispatch::IntegrationTest
+  include SeedsPipelineTables
+
   setup do
     @me = hold_role!("UME", "community_manager")
     sign_in_as(@me)
@@ -11,13 +13,7 @@ class FdBlockedDomainsTest < ActionDispatch::IntegrationTest
   end
 
   def member_on!(user_id, email)
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.member (user_id) VALUES (?) ON CONFLICT DO NOTHING", user_id
-    ]))
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.member_identity (user_id, email) VALUES (?, ?) " \
-      "ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email", user_id, email
-    ]))
+    member!(user_id, email: email)
   end
 
   test "a domain lands on the list and starts by only writing things down" do
@@ -139,10 +135,9 @@ class FdBlockedDomainsTest < ActionDispatch::IntegrationTest
 
   test "the tab lists what is held and who was caught" do
     add
-    ApplicationRecord.connection.execute(ApplicationRecord.sanitize_sql([
-      "INSERT INTO fd.join_screen (user_id, email_domain, outcome) VALUES (?, ?, 'flagged')",
-      "UCAUGHT", "throwaway.example"
-    ]))
+    as_pipeline("INSERT INTO fd.join_screen (user_id, email_domain, outcome) " \
+                "VALUES (?, ?, 'flagged')", "UCAUGHT", "throwaway.example")
+    seeded!("fd.join_screen", "user_id", "UCAUGHT")
 
     get fd_configuration_path(tab: "domains")
     assert_response :success

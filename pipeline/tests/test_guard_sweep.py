@@ -59,6 +59,35 @@ def guard(**over):
     return row
 
 
+def test_a_lift_by_hand_is_swept_only_until_it_has_been_said():
+    assert "state = 'lifted'" in memberguards.LIFTED_UNTOLD
+    assert "carried_by = 'nemo'" in memberguards.LIFTED_UNTOLD
+    assert "e.verb = 'released'" in memberguards.LIFTED_UNTOLD
+
+
+def test_somebody_whose_shush_was_lifted_in_the_dashboard_is_told(monkeypatch):
+    client = Slack()
+    told = []
+    monkeypatch.setattr(sweep.memberguards, "lifted_untold",
+                        lambda _conn, _within: [guard()])
+    monkeypatch.setattr(sweep.memberguards, "happened",
+                        lambda *args, **over: told.append(args[4]))
+    monkeypatch.setattr(sweep, "session", lambda: FakeSession())
+    monkeypatch.setattr(sweep, "tells_member", lambda _conn: True)
+
+    assert sweep.sweep_lifted(client) == 1
+    assert told == [memberguards.RELEASED, "told"]
+    assert "can post again" in client.posted[0]["text"]
+
+
+class FakeSession:
+    def __enter__(self):
+        return Conn()
+
+    def __exit__(self, *_):
+        return False
+
+
 def test_only_a_date_already_passed_is_swept():
     assert "expires_at <= now()" in memberguards.LAPSED
     assert "state = 'live'" in memberguards.LAPSED
