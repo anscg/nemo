@@ -1425,6 +1425,31 @@ module FdHelper
     "failed" => "nemo is not holding it"
   }.freeze
 
+  GUARD_CARRY_SAID = {
+    "pending" => "Asking Slack",
+    "held" => "Deactivated in Slack",
+    "failed" => "Slack refused",
+    "lifting" => "Putting the account back"
+  }.freeze
+
+  GUARD_DOT_TONE = {
+    "pending" => "warn",
+    "held" => "crit",
+    "failed" => "crit",
+    "lifting" => "good"
+  }.freeze
+
+  def guard_carry_said(guard)
+    GUARD_CARRY_SAID.fetch(guard.carry_state, guard.carry_state)
+  end
+
+  def guard_dot_tone(guard)
+    return "crit" if guard.failed?
+    return GUARD_DOT_TONE.fetch(guard.carry_state, "act") if guard.deactivation?
+
+    "act"
+  end
+
   def guard_footnote(guard, names = Names.none)
     said = ["opened by #{names[guard.opened_by]}"]
     said << "since #{guard.opened_at.strftime("%-d %b")}" if guard.opened_at

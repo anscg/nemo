@@ -241,6 +241,13 @@
     margin-left: var(--s-xs);
     background: var(--line);
   }
+  .ractions-split {
+    width: 1px;
+    height: 18px;
+    flex: none;
+    margin: 0 var(--s-3xs, 2px);
+    background: var(--line);
+  }
 
   .mi { display: flex; align-items: flex-start; gap: var(--s-2xs); min-width: 0; }
   .mi-ic { color: var(--ink-3); flex: none; margin-top: 1px; }

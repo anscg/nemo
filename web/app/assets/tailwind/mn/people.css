@@ -110,6 +110,37 @@
   .standing-row { display: flex; align-items: center; gap: var(--s-2xs); flex-wrap: wrap; }
   .standing-row .grow { min-width: 160px; }
 
+  .standing-row.is-carried {
+    position: relative;
+    overflow: clip;
+    border-radius: var(--r-card);
+    padding: var(--s-3xs) var(--s-2xs);
+    margin: calc(var(--s-3xs) * -1) calc(var(--s-2xs) * -1);
+  }
+  .carry-said {
+    display: block;
+    font-size: var(--t-small);
+    font-weight: 550;
+    color: var(--ink-2);
+  }
+  .carry-slow, .carry-why {
+    display: block;
+    font-size: var(--t-small);
+    color: var(--ink-3);
+  }
+  .carry-why { overflow-wrap: anywhere; }
+
+  .standing-row[data-carry="pending"] .carry-said { color: var(--warn, var(--ink-2)); }
+  .standing-row[data-carry="failed"] .carry-said { color: var(--crit, var(--ink-2)); }
+  .standing-row[data-carry="held"] {
+    color: var(--ink-3);
+  }
+  .standing-row[data-carry="held"] .standing-line > b {
+    color: var(--ink-2);
+    text-decoration: line-through;
+    text-decoration-color: var(--line);
+  }
+
   .member-section {
     border: 1px solid var(--line);
     border-radius: var(--r-card);

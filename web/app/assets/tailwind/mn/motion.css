@@ -15,6 +15,15 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
+  @keyframes carry-settle {
+    0%   { transform: scale(1); }
+    36%  { transform: scale(1.012); }
+    100% { transform: scale(1); }
+  }
+  @keyframes carry-wash {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(200%); }
+  }
 
   .chart > svg, .hbars > svg, .tree > svg, .lorenz > svg {
     animation: chart-in var(--dur-3) var(--ease-out) both;
@@ -72,6 +81,39 @@
     z-index: 4;
   }
 
+  .standing-row.is-carried {
+    transition: background-color var(--dur-3) var(--ease), color var(--dur-3) var(--ease);
+  }
+  .standing-row.is-carried .carry-said { transition: color var(--dur-2) var(--ease); }
+
+  .standing-row.is-carried.just-landed {
+    animation: carry-settle 620ms var(--ease-out) both;
+  }
+  .standing-row.is-carried.just-landed::after {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--accent) 16%, transparent),
+      transparent
+    );
+    animation: carry-wash 760ms var(--ease-out) both;
+  }
+  .standing-row.is-carried[data-carry="held"].just-landed {
+    background: color-mix(in oklab, var(--crit) 7%, transparent);
+  }
+  .standing-row.is-carried[data-carry="lifting"].just-landed,
+  .standing-row.is-carried[data-carry="pending"].just-landed {
+    background: color-mix(in oklab, var(--accent) 7%, transparent);
+  }
+  .standing-row.is-carried[data-carry="failed"].just-landed {
+    background: color-mix(in oklab, var(--crit) 10%, transparent);
+  }
+
   .qrow, .member-qrow, .merge-qrow, .palette-row, .pick-opt, .picker-opt {
     transition: background-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
   }
@@ -93,7 +135,9 @@
   @media (prefers-reduced-motion: reduce) {
     .chart > svg, .hbars > svg, .tree > svg, .lorenz > svg,
     .chart .bar, .hbars .bar, .tree .cell rect, .parts .cell rect,
-    turbo-frame[aria-busy="true"]::after {
+    turbo-frame[aria-busy="true"]::after,
+    .standing-row.is-carried.just-landed,
+    .standing-row.is-carried.just-landed::after {
       animation: none;
     }
     .work { transition: none; }

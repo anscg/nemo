@@ -9,6 +9,7 @@ module Fd
 
     UNDONE_IN_SLACK = [DEACTIVATION].freeze
     DATELESS = [DEACTIVATION].freeze
+    HOLDS = (KINDS - [DEACTIVATION]).freeze
 
     LIVE = "live".freeze
     LIFTING = "lifting".freeze
@@ -32,6 +33,8 @@ module Fd
     ORPHANED = :orphaned
     ELSEWHERE = :elsewhere
     HERE = :here
+
+    FRESH = 20.seconds
 
     has_many :events, class_name: "Fd::MemberGuardEvent", foreign_key: :guard_id,
       inverse_of: :guard, dependent: :destroy
@@ -67,6 +70,11 @@ module Fd
       return [] if said.nil?
 
       still_on.for_subject(said).oldest_first.to_a
+    end
+
+    def self.worst_first(guards)
+      weight = Action::WORST_FIRST
+      guards.sort_by { |guard| [weight.index(guard.kind) || weight.size, -guard.opened_at.to_i] }
     end
 
     def self.standing_for(subject_id, kind:, channel_id: nil)
@@ -120,10 +128,20 @@ module Fd
     def live? = state == LIVE
     def lifting? = state == LIFTING
     def held? = carry == HELD
+    def pending? = carry == PENDING
     def failed? = carry == FAILED
     def by_hand? = carried_by == BY_HAND
     def orphaned? = case_id.nil?
     def channel_scoped? = channel_id.present?
+    def deactivation? = kind == DEACTIVATION
+
+    def carry_state
+      lifting? ? LIFTING : carry
+    end
+
+    def landed?(at = Time.current)
+      updated_at.present? && updated_at > at - FRESH
+    end
 
     def on_case?(case_ids) = case_id.present? && Array(case_ids).include?(case_id)
 

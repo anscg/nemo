@@ -7,8 +7,8 @@
       <div class="field-label">
         <span>What to hold</span>
         <%= render "shared/choice", name: :kind,
-              chosen: action_label(Fd::MemberGuard::KINDS.first),
-              options: Fd::MemberGuard::KINDS.each_with_index.map { |key, i| {
+              chosen: action_label(Fd::MemberGuard::HOLDS.first),
+              options: Fd::MemberGuard::HOLDS.each_with_index.map { |key, i| {
                 value: key, label: action_label(key), current: i.zero? } } %>
       </div>
 
@@ -33,25 +33,5 @@
       <button type="button" class="btn btn-ghost" data-action="click->modal#shut">Cancel</button>
       <%= submit_tag "Hold it", class: "btn btn-primary" %>
     </div>
-  <% end %>
-<% end %>
-
-<% guards.each do |guard| %>
-  <%= render layout: "fd/modal", locals: { id: "guard-lift-#{guard.id}", title: "Lift it",
-        sub: member, open: false } do %>
-    <%= form_with url: fd_member_guard_path(user_id, guard), method: :delete,
-          html: { autocomplete: "off" } do %>
-      <div class="modal-body">
-        <p class="modal-note">It stops standing. The record keeps it, and what it was for.</p>
-        <label class="field-label">
-          Why it is being lifted
-          <%= text_area_tag :lift_reason, nil, rows: 3, class: "textarea", id: nil %>
-        </label>
-      </div>
-      <div class="modal-foot">
-        <button type="button" class="btn btn-ghost" data-action="click->modal#shut">Cancel</button>
-        <%= submit_tag "Lift it", class: "btn btn-danger" %>
-      </div>
-    <% end %>
   <% end %>
 <% end %>

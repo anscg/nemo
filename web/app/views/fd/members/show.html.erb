@@ -3,6 +3,8 @@
 <% member_name = @member&.display_name.presence || names[@user_id] %>
 <% may_note = current_account.may?("member.note") %>
 <% may_guard = current_account.may?("member.guard") %>
+<% may_deactivate = current_account.may?("member.deactivate") %>
+<% standing_guard = @guards.find(&:deactivation?) %>
 
 <% content_for :page_title, (names.unknown?(@user_id) ? person_name(@user_id) : member_handle) %>
 <% content_for :page_face do %><%= face(@user_id) %><% end %>
@@ -24,6 +26,17 @@
       <%= case_action_button("gauge", "Take action") %>
     </button>
   <% end %>
+  <%= render layout: "shared/dropdown", locals: {
+        label: "More actions", trigger: menu_dots } do %>
+    <% if standing_guard %>
+      <%= opens_modal "member.deactivate", menu_item("hand", "Activate"),
+            opens: "guard-lift-#{standing_guard.id}" %>
+    <% else %>
+      <%= opens_modal "member.deactivate", menu_item("deactivate", "Deactivate"),
+            opens: "member-deactivate" %>
+    <% end %>
+  <% end %>
+  <span class="ractions-split" aria-hidden="true"></span>
   <%= link_to case_action_button("plus", "Open a case"),
         fd_cases_path(subject_user_id: @user_id, open: "1"), class: "btn btn-primary" %>
 <% end %>
@@ -65,31 +78,11 @@
     </div>
   </dl>
 
-  <div class="member-record-content">
-    <% if @guards.any? %>
-      <div class="standing">
-        <p class="standing-t">In force now</p>
-        <% @guards.each do |guard| %>
-          <div class="standing-row">
-            <span class="evdot <%= guard.failed? ? "crit" : "act" %>">
-              <%= case_action_icon("gauge") %>
-            </span>
-            <span class="grow standing-line">
-              <b><%= guard_held_line(guard) %></b>
-              <span class="sub"><%= guard_footnote(guard, names) %></span>
-            </span>
-            <% if guard.case_id %>
-              <%= link_to "Open case ##{guard.case_id}", fd_case_path(guard.case_id),
-                    class: "btn btn-ghost" %>
-            <% end %>
-            <% if may_guard %>
-              <button type="button" class="btn" aria-haspopup="dialog"
-                      data-modal-open="guard-lift-<%= guard.id %>">Lift it</button>
-            <% end %>
-          </div>
-        <% end %>
-      </div>
-    <% end %>
+  <div class="member-record-content" data-controller="catch-up"
+       data-catch-up-frame-value="<%= Fd::MemberGuardBroadcast.frame(@user_id) %>">
+    <%= turbo_stream_from Fd::MemberGuardBroadcast.stream(@user_id) %>
+    <%= render "standing", user_id: @user_id, guards: @guards, names: names,
+          may_guard: may_guard, may_deactivate: may_deactivate %>
 
     <% if @record.subject_cases.any? %>
       <section class="member-section">
@@ -175,7 +168,12 @@
 </div>
 
 <% if may_guard %>
-  <%= render "guards", guards: @guards, user_id: @user_id, member: names[@user_id] %>
+  <%= render "guards", user_id: @user_id, member: names[@user_id] %>
+<% end %>
+
+<% if may_deactivate && standing_guard.nil? %>
+  <%= render "deactivate", user_id: @user_id, member: names[@user_id],
+        handle: member_handle %>
 <% end %>
 
 <% if may_note %>

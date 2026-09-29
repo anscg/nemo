@@ -78,11 +78,12 @@ module Fd
 
     def named(user_id) = Names.for([user_id])[user_id]
 
-    def expiry
-      said = params[:expires_on].to_s.strip
-      return nil if said.blank?
+    def said_when = params[:expires_on].to_s.strip
 
-      Date.strptime(said, "%Y-%m-%d").end_of_day
+    def expiry
+      return nil if said_when.blank?
+
+      Date.strptime(said_when, "%Y-%m-%d").end_of_day
     rescue Date::Error
       nil
     end
@@ -93,6 +94,7 @@ module Fd
       if kind == MemberGuard::CHANNEL_BAN && !channel_id.match?(SlackLink::CHANNEL)
         return "a channel ban needs a channel"
       end
+      return "#{said_when} is not a date" if expiry.nil? && said_when.present?
       if expiry.nil? && !MemberGuard::DATELESS.include?(kind)
         return "say the date it runs until"
       end
