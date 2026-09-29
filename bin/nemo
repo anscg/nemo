@@ -26,6 +26,7 @@ nemo <role> [args]
   sync           the nightly sync worker
   history        member_history's search backfill, drained continuously
   archive        channel history and thread replies
+  audit          the slack audit log, tailed and backfilled
   transform      dbt build
   seed           generate synthetic data, transform, then verify
   provision      schemas, roles, grants and both migration sets
@@ -66,6 +67,9 @@ case "$ROLE" in
     ;;
   archive)
     py -m jobs.archive_worker "$@"
+    ;;
+  audit)
+    py -m jobs.audit_worker "$@"
     ;;
   transform)
     export NEMO_LOCK_TIMEOUT="${NEMO_LOCK_TIMEOUT:-60000}"

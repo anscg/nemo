@@ -1,0 +1,279 @@
+import os
+from datetime import UTC, date, datetime, timedelta
+
+from psycopg.types.json import Jsonb
+
+from lib import coverage, useragent
+from lib.db import dead_letter, get_cursor, ingest_run, save_cursor
+from lib.proxy_client import ProxyClient
+
+METHOD = "audit.logs"
+CREDENTIAL = "admin"
+PAGE = 1000
+
+TAIL = "audit_logs_tail"
+BACKFILL = "audit_logs_backfill"
+
+LOGIN_ACTIONS = (
+    "user_login",
+    "user_login_failed",
+    "user_logout",
+    "user_created",
+    "user_joined_workspace",
+    "guest_joined_workspace",
+    "user_session_reset_by_admin",
+    "user_session_invalidated",
+    "anomaly",
+)
+
+LOGIN_SET = frozenset(LOGIN_ACTIONS)
+SEATED = frozenset({"user_login", "user_login_failed", "anomaly"})
+
+DEFAULT_HORIZON_DAYS = 90
+LAP_SECONDS = 1
+FIRST_TAIL_HOURS = 24
+
+EVENT_SQL = """
+INSERT INTO slack.audit_event
+    (id, at, action, actor_kind, actor_id, entity_kind, entity_id, app_id, ours,
+     context, payload, source_key)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (id) DO NOTHING
+"""
+
+LOGIN_SQL = """
+INSERT INTO fd.login_event
+    (user_id, at, source, action, ip, ip_prefix, ua, ua_app, ua_os, session_id)
+VALUES (%s, %s, 'audit_logs', %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (user_id, at, source) DO UPDATE SET
+    ip = coalesce(EXCLUDED.ip, fd.login_event.ip),
+    ip_prefix = coalesce(EXCLUDED.ip_prefix, fd.login_event.ip_prefix),
+    ua = coalesce(EXCLUDED.ua, fd.login_event.ua),
+    ua_app = coalesce(EXCLUDED.ua_app, fd.login_event.ua_app),
+    ua_os = coalesce(EXCLUDED.ua_os, fd.login_event.ua_os),
+    session_id = coalesce(EXCLUDED.session_id, fd.login_event.session_id),
+    updated_at = now()
+"""
+
+WATERMARK_SQL = "SELECT max(at) FROM slack.audit_event"
+
+
+def horizon_days():
+    try:
+        return max(1, int(os.environ.get("AUDIT_HORIZON_DAYS", "") or DEFAULT_HORIZON_DAYS))
+    except ValueError:
+        return DEFAULT_HORIZON_DAYS
+
+
+MOST_ACTIONS = 30
+
+
+def tail_actions():
+    said = os.environ.get("AUDIT_TAIL_ACTIONS", "").strip()
+    if not said:
+        return None
+    if said.lower() in ("login", "logins"):
+        return LOGIN_ACTIONS
+    return tuple(one.strip() for one in said.split(",") if one.strip())[:MOST_ACTIONS]
+
+
+def nemo_ids():
+    said = os.environ.get("AUDIT_NEMO_ID", "")
+    return frozenset(one.strip() for one in said.split(",") if one.strip())
+
+
+def stamp(seconds):
+    try:
+        return datetime.fromtimestamp(int(seconds), tz=UTC)
+    except (TypeError, ValueError, OSError):
+        return None
+
+
+def whose(entry, key):
+    held = entry.get(key) or {}
+    kind = held.get("type")
+    if not kind:
+        return None, None
+    body = held.get(kind) or {}
+    return kind, body.get("id")
+
+
+def event_row(entry, source_key, ours):
+    at = stamp(entry.get("date_create"))
+    if not entry.get("id") or at is None or not entry.get("action"):
+        return None
+
+    context = entry.get("context") or {}
+    app_id = ((context.get("app") or {}).get("id")) or None
+    actor_kind, actor_id = whose(entry, "actor")
+    entity_kind, entity_id = whose(entry, "entity")
+
+    return (
+        entry["id"], at, entry["action"], actor_kind, actor_id, entity_kind, entity_id,
+        app_id, bool(app_id and app_id in ours), Jsonb(context), Jsonb(entry), source_key,
+    )
+
+
+def prefix_of(ip):
+    if not ip:
+        return None
+    return f"{ip}/24" if ":" not in ip else f"{ip}/64"
+
+
+def login_row(entry):
+    if entry.get("action") not in SEATED:
+        return None
+
+    _kind, user_id = whose(entry, "actor")
+    at = stamp(entry.get("date_create"))
+    if not user_id or at is None:
+        return None
+
+    context = entry.get("context") or {}
+    ip = (context.get("ip_address") or "").strip() or None
+    seen = useragent.parse(context.get("ua"))
+    session = context.get("session_id")
+
+    return (
+        user_id, at, entry["action"], ip, prefix_of(ip),
+        seen["ua"], seen["ua_app"], seen["ua_os"],
+        int(session) if str(session or "").isdigit() else None,
+    )
+
+
+def land(conn, entries, source_key, ours, counts):
+    events, logins = [], []
+    for entry in entries:
+        row = event_row(entry, source_key, ours)
+        if row is None:
+            counts.rows_rejected += 1
+            dead_letter(conn, source_key, {"keys": sorted(entry)}, "no id, action or date")
+            continue
+        events.append(row)
+        seated = login_row(entry)
+        if seated:
+            logins.append(seated)
+
+    if events:
+        with conn.cursor() as cur:
+            cur.executemany(EVENT_SQL, events)
+            if logins:
+                cur.executemany(LOGIN_SQL, logins)
+    conn.commit()
+    counts.rows_in += len(events)
+    return len(events), len(logins)
+
+
+def walk(client, conn, source_key, counts, oldest=None, latest=None, actions=None,
+         start_cursor=None, on_cursor=None):
+    asked = {}
+    if oldest is not None:
+        asked["oldest"] = int(oldest.timestamp())
+    if latest is not None:
+        asked["latest"] = int(latest.timestamp())
+    if actions:
+        asked["action"] = ",".join(actions[:MOST_ACTIONS])
+
+    ours = nemo_ids()
+    held = []
+    landed = seated = 0
+
+    def flush():
+        nonlocal landed, seated
+        if not held:
+            return
+        grew, lit = land(conn, held, source_key, ours, counts)
+        landed += grew
+        seated += lit
+        held.clear()
+
+    def page_done(cursor, _page):
+        flush()
+        if on_cursor:
+            on_cursor(cursor)
+
+    held.extend(client.paginate(
+        METHOD, asked, "entries", page_size=PAGE, cursor_param="cursor",
+        credential=CREDENTIAL, page_param="limit",
+        cursor_field="response_metadata.next_cursor",
+        start_cursor=start_cursor, on_page=page_done, allow_empty_pages=True,
+    ))
+
+    flush()
+    return landed, seated
+
+
+def watermark(conn):
+    row = conn.execute(WATERMARK_SQL).fetchone()
+    return row[0] if row and row[0] else None
+
+
+def tail(conn, client=None):
+    client = client or ProxyClient.for_source(TAIL)
+    since = watermark(conn) or datetime.now(UTC) - timedelta(hours=FIRST_TAIL_HOURS)
+    oldest = since - timedelta(seconds=LAP_SECONDS)
+
+    with ingest_run(conn, TAIL) as counts:
+        held = get_cursor(conn, TAIL)
+        landed, seated = walk(
+            client, conn, TAIL, counts, oldest=oldest, actions=tail_actions(),
+            start_cursor=held,
+            on_cursor=lambda cursor: save_cursor(conn, TAIL, cursor or ""),
+        )
+        save_cursor(conn, TAIL, "")
+
+    print(f"{TAIL}: {landed} event(s), {seated} login(s) since {oldest:%Y-%m-%d %H:%M}")
+    return landed
+
+
+def slice_keys(days):
+    today = datetime.now(UTC).date()
+    return [today - timedelta(days=step) for step in range(days)]
+
+
+def source_key_for(actions):
+    return f"{BACKFILL}:logins" if actions else f"{BACKFILL}:all"
+
+
+def next_slice(conn, source_key, days):
+    done = coverage.covered(conn, source_key)
+    for day in slice_keys(days):
+        if day.isoformat() not in done:
+            return day
+    return None
+
+
+def bounds(day: date):
+    start = datetime(day.year, day.month, day.day, tzinfo=UTC)
+    return start, start + timedelta(days=1)
+
+
+def backfill(conn, client=None, actions=LOGIN_ACTIONS):
+    client = client or ProxyClient.for_source(BACKFILL)
+    source_key = source_key_for(actions)
+    day = next_slice(conn, source_key, horizon_days())
+    if day is None:
+        return 0
+
+    slice_key = day.isoformat()
+    start, stop = bounds(day)
+    fence = coverage.claim_slice(conn, source_key, slice_key, start=day, stop=day)
+    if fence is None:
+        return 0
+
+    try:
+        with ingest_run(conn, BACKFILL, slice_key=slice_key) as counts:
+            landed, seated = walk(client, conn, source_key, counts,
+                                  oldest=start, latest=stop, actions=actions)
+    except Exception as failure:
+        coverage.settle_aside(source_key, slice_key, fence, "short", note=str(failure))
+        raise
+
+    coverage.settle(conn, source_key, slice_key, fence, "complete", landed=landed)
+    conn.commit()
+    print(f"{source_key} {slice_key}: {landed} event(s), {seated} login(s)")
+    return landed
+
+
+def run(conn):
+    return tail(conn)

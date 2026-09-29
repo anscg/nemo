@@ -105,6 +105,19 @@ ROLES = {
             "TZ",
         ],
     },
+    "audit": {
+        "required": DATABASE + ["INTERNAL_PROXY_URL", "INTERNAL_PROXY_TOKEN"],
+        "optional": PIPELINE_ROLE + [
+            "AUDIT_BACKFILL",
+            "AUDIT_BACKFILL_SECONDS",
+            "AUDIT_HORIZON_DAYS",
+            "AUDIT_NEMO_ID",
+            "AUDIT_TAIL_ACTIONS",
+            "AUDIT_TAIL_SECONDS",
+            "PROXY_ALLOW_PLAINTEXT",
+            "TZ",
+        ],
+    },
     "transform": {
         "required": DATABASE,
         "optional": DBT_ROLE + ["TZ"],
@@ -175,6 +188,9 @@ DEFAULTS = {
     "NIGHTLY_AT": "03:00",
     "NIGHTLY_RUN_AT_START": "false",
     "ARCHIVE_POLL_SECONDS": "300",
+    "AUDIT_TAIL_SECONDS": "60",
+    "AUDIT_BACKFILL_SECONDS": "120",
+    "AUDIT_HORIZON_DAYS": "90",
     "SYNC_POLL_SECONDS": "60",
     "SEED_SCALE": "dev",
     "SEED_RNG": "1",
@@ -192,6 +208,7 @@ HEADINGS = {
     "bot.shroud": "shroud alone, taking reports and carrying the outbox. long running",
     "bot.nemo": "nemo alone, working the cases in the firehouse. long running",
     "archive": "channel history and thread replies. long running",
+    "audit": "the slack audit log, tailed and backfilled a day at a time. long running",
 }
 
 BOT_NEVER = [

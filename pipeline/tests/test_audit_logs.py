@@ -1,0 +1,196 @@
+import datetime as dt
+
+import pytest
+
+from ingest import audit_logs_pull as pull
+from lib import useragent
+
+WHO = "U1"
+APP = "A0BJDDB42N7"
+
+
+def entry(**over):
+    row = {
+        "id": "0dc5d1ec-1111-2222-3333-444455556666",
+        "date_create": 1790680410,
+        "action": "user_login",
+        "actor": {"type": "user", "user": {"id": WHO, "name": "zev"}},
+        "entity": {"type": "user", "user": {"id": WHO}},
+        "context": {
+            "location": {"type": "workspace", "id": "T0266FRGM", "name": "Hack Club"},
+            "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36",
+            "ip_address": "157.51.215.171",
+            "session_id": 12177102026566,
+        },
+    }
+    row.update(over)
+    return row
+
+
+class Counts:
+    def __init__(self):
+        self.rows_in = 0
+        self.rows_rejected = 0
+
+
+def test_an_entry_becomes_a_row_the_database_will_take():
+    row = pull.event_row(entry(), "audit_logs_tail", frozenset())
+
+    assert row[0] == entry()["id"]
+    assert row[1] == dt.datetime.fromtimestamp(1790680410, tz=dt.UTC)
+    assert row[2] == "user_login"
+    assert row[3:5] == ("user", WHO)
+    assert row[5:7] == ("user", WHO)
+
+
+def test_an_entry_with_no_id_or_no_date_is_refused_rather_than_landed():
+    assert pull.event_row(entry(id=""), "k", frozenset()) is None
+    assert pull.event_row(entry(date_create=None), "k", frozenset()) is None
+    assert pull.event_row(entry(action=""), "k", frozenset()) is None
+
+
+def test_our_own_reads_are_marked_so_they_can_be_told_apart():
+    said = entry(action="public_channel_preview",
+                 context={"app": {"id": APP, "name": "Nemo"}})
+
+    assert pull.event_row(said, "k", frozenset({APP}))[8] is True
+    assert pull.event_row(said, "k", frozenset())[8] is False
+    assert pull.event_row(entry(), "k", frozenset({APP}))[8] is False
+
+
+def test_a_login_carries_the_address_the_agent_and_the_session():
+    row = pull.login_row(entry())
+
+    assert row[0] == WHO
+    assert row[2] == "user_login"
+    assert row[3] == "157.51.215.171"
+    assert row[4] == "157.51.215.171/24"
+    assert row[6] == "Chrome 141"
+    assert row[7] == "Windows 10 or 11"
+    assert row[8] == 12177102026566
+
+
+def test_only_the_actions_that_seat_somebody_make_a_login():
+    assert pull.login_row(entry(action="user_login_failed")) is not None
+    assert pull.login_row(entry(action="anomaly")) is not None
+    assert pull.login_row(entry(action="file_downloaded")) is None
+    assert pull.login_row(entry(action="user_channel_join")) is None
+
+
+def test_a_login_with_nobody_behind_it_is_not_written_down():
+    assert pull.login_row(entry(actor={"type": "user", "user": {}})) is None
+    assert pull.login_row(entry(actor={})) is None
+
+
+def test_a_session_that_is_not_a_number_does_not_stop_the_row():
+    row = pull.login_row(entry(context={"session_id": "nonsense", "ip_address": "1.2.3.4"}))
+    assert row[8] is None
+    assert row[3] == "1.2.3.4"
+
+
+def test_an_ipv6_address_is_held_by_its_own_prefix():
+    assert pull.prefix_of("2a00:1450:4009:81f::200e") == "2a00:1450:4009:81f::200e/64"
+    assert pull.prefix_of("1.2.3.4") == "1.2.3.4/24"
+    assert pull.prefix_of(None) is None
+
+
+def test_the_tail_asks_for_everything_unless_it_is_told_to_narrow(monkeypatch):
+    monkeypatch.delenv("AUDIT_TAIL_ACTIONS", raising=False)
+    assert pull.tail_actions() is None
+
+    monkeypatch.setenv("AUDIT_TAIL_ACTIONS", "logins")
+    assert pull.tail_actions() == pull.LOGIN_ACTIONS
+
+    monkeypatch.setenv("AUDIT_TAIL_ACTIONS", " user_login , anomaly ")
+    assert pull.tail_actions() == ("user_login", "anomaly")
+
+
+def test_no_more_actions_are_asked_for_than_slack_will_take(monkeypatch):
+    monkeypatch.setenv("AUDIT_TAIL_ACTIONS", ",".join(f"a{n}" for n in range(60)))
+    assert len(pull.tail_actions()) == pull.MOST_ACTIONS
+
+
+def test_a_slice_covers_one_whole_day_in_utc():
+    start, stop = pull.bounds(dt.date(2026, 9, 29))
+
+    assert start == dt.datetime(2026, 9, 29, tzinfo=dt.UTC)
+    assert stop == dt.datetime(2026, 9, 30, tzinfo=dt.UTC)
+    assert (stop - start) == dt.timedelta(days=1)
+
+
+def test_the_action_set_is_part_of_the_coverage_key_so_a_window_cannot_lie():
+    assert pull.source_key_for(pull.LOGIN_ACTIONS).endswith(":logins")
+    assert pull.source_key_for(None).endswith(":all")
+    assert pull.source_key_for(pull.LOGIN_ACTIONS) != pull.source_key_for(None)
+
+
+def test_the_tail_laps_back_a_second_so_the_seam_cannot_drop_an_event():
+    assert pull.LAP_SECONDS >= 1
+
+
+class Conn:
+    def __init__(self):
+        self.ran = []
+
+    def cursor(self):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def execute(self, sql, args=None):
+        self.ran.append((sql, args))
+        return self
+
+    def executemany(self, sql, rows):
+        self.ran.append((sql, rows))
+
+    def commit(self):
+        pass
+
+    def fetchone(self):
+        return (0,)
+
+    def did(self, mark):
+        return [args for sql, args in self.ran if mark in sql]
+
+
+def test_landing_writes_the_event_and_the_login_from_one_pass():
+    conn, counts = Conn(), Counts()
+    landed, seated = pull.land(conn, [entry(), entry(id="b", action="file_downloaded")],
+                               "audit_logs_tail", frozenset(), counts)
+
+    assert (landed, seated) == (2, 1)
+    assert counts.rows_in == 2
+    assert len(conn.did("INSERT INTO slack.audit_event")[0]) == 2
+    assert len(conn.did("INSERT INTO fd.login_event")[0]) == 1
+
+
+def test_a_landed_event_is_never_written_twice():
+    assert "ON CONFLICT (id) DO NOTHING" in pull.EVENT_SQL
+    assert "ON CONFLICT (user_id, at, source) DO UPDATE" in pull.LOGIN_SQL
+
+
+@pytest.mark.parametrize(("said", "app", "system"), [
+    ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36",
+     "Chrome 141", "Windows 10 or 11"),
+    ("slack/26.09.41.0.90016209 (samsung SM-A235F; Android 14; store com.android.vending)",
+     "Slack Android 26", "Android 14"),
+    ("Python/3.13.15 slackclient/3.43.0 Linux/4.19.0-gvisor", "Slack SDK", "Linux"),
+    ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Slack_SSB/4.45.69 Electron/32.2.5",
+     "Slack Desktop 4", "macOS 10.15.7"),
+    ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) Version/18.2 Safari/604.1",
+     "Safari 18", "iOS 18.2"),
+])
+def test_the_agent_string_is_read_into_an_app_and_a_system(said, app, system):
+    seen = useragent.parse(said)
+    assert seen["ua_app"] == app
+    assert seen["ua_os"] == system
+
+
+def test_an_agent_string_nobody_recognises_does_not_blow_up():
+    assert useragent.parse("") == {"ua": None, "ua_app": None, "ua_os": None}
+    assert useragent.parse("something else entirely")["ua_app"] is None

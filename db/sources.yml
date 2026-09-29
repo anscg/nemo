@@ -262,6 +262,36 @@ sources:
       cohort_days: {default: 30, min: 7, max: 90}
 
 
+  audit_logs_tail:
+    unit_budget_seconds: 120
+    standalone: true
+    label: Every audit event since the last one we landed
+    endpoint: audit.logs
+    documented: true
+    credential: admin
+    cadence: live
+    window: since the watermark
+    guard: cursor end
+    resume: sync_cursor
+    retention: keep
+    writes: [slack.audit_event, fd.login_event]
+    feeds: []
+
+  audit_logs_backfill:
+    unit_budget_seconds: 300
+    standalone: true
+    label: Older audit events, one day at a time
+    endpoint: audit.logs
+    documented: true
+    credential: admin
+    cadence: on_demand
+    window: 1 day
+    guard: cursor end
+    resume: cursor
+    retention: keep
+    writes: [slack.audit_event, fd.login_event]
+    feeds: []
+
   prune:
     label: Drop rows past their retention window
     endpoint: none
