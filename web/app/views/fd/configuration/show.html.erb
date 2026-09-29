@@ -13,8 +13,13 @@
   <%= render "automod", words: @words, retired: @retired, matches: @matches %>
 <% end %>
 
+<% if @tab == "domains" %>
+  <%= render "domains", domains: @domains, screens: @screens %>
+<% end %>
+
 <% if @tab == "responses" %>
   <%= render "responses" %>
 <% end %>
 
 <%= render "word_modal" %>
+<%= render "domain_modal" %>

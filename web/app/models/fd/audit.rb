@@ -24,6 +24,7 @@ module Fd
       "Fd::MemberGuard" => "member_guard",
       "Fd::ThreadGuard" => "thread_guard",
       "Fd::AutomodWord" => "automod_word",
+      "Fd::BlockedDomain" => "blocked_domain",
       "Fd::ChannelPurge" => "channel_purge",
       "Fd::ChannelGuardAllow" => "channel_allow",
       "Fd::AppSetting" => "app_setting",

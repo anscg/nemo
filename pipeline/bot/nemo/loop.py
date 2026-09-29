@@ -4,8 +4,7 @@ import threading
 
 from bot.core import loops, session
 from bot.nemo import automod, channel, channelguards, channels, chat, guards, guardwork
-from bot.nemo import memberguards, responses
-from bot.nemo import carriers
+from bot.nemo import carriers, memberguards, responses, screening
 from bot.nemo.carriers import purge, sweep
 
 log = logging.getLogger("bot.nemo")
@@ -21,6 +20,7 @@ MEMBER_GUARD = "fd_member_guard"
 APP_SETTING = "fd_app_setting"
 AUTOMOD_WORD = "fd_automod_word"
 CHANNEL_PURGE = "fd_channel_purge"
+BLOCKED_DOMAIN = "fd_blocked_domain"
 
 DEFAULT_SECONDS = 300
 DEFAULT_JOIN_SECONDS = 1800
@@ -131,6 +131,7 @@ def once(desk, channel_id=None):
         memberguards.refresh(conn)
         automod.refresh(conn)
         responses.refresh(conn)
+        screening.refresh(conn)
         taking_up = memberguards.uncarried(conn)
         channel.firehouse_channel(conn)
         destroying = guards.pending(conn)
@@ -179,6 +180,7 @@ def start(desk, stopping, channel_id=None):
                  guards.refresh(conn), channelguards.refresh(conn),
                  memberguards.refresh(conn), automod.refresh(conn))
         responses.refresh(conn)
+        screening.refresh(conn)
 
     def heard(channel_name, told):
         if channel_name == CHAT:
@@ -199,6 +201,9 @@ def start(desk, stopping, channel_id=None):
         elif channel_name == AUTOMOD_WORD:
             with session() as conn:
                 automod.refresh(conn)
+        elif channel_name == BLOCKED_DOMAIN:
+            with session() as conn:
+                screening.refresh(conn)
         elif channel_name == CHANNEL_PURGE:
             threading.Thread(
                 target=purge.run, args=(desk.client, told),
@@ -225,7 +230,8 @@ def start(desk, stopping, channel_id=None):
     return (
         loops.watching(NAME,
                        (CASES, CHAT, OUTBOX, CONVERSATION, GUARD, CHANNEL_GUARD,
-                        MEMBER_GUARD, APP_SETTING, AUTOMOD_WORD, CHANNEL_PURGE),
+                        MEMBER_GUARD, APP_SETTING, AUTOMOD_WORD, CHANNEL_PURGE,
+                        BLOCKED_DOMAIN),
                        heard, stopping),
         loops.sweeping(NAME, every(), lambda: once(desk, channel_id), stopping),
         loops.sweeping(f"{NAME}-joins", every_join_sweep(), lambda: join_sweep(desk), stopping),

@@ -206,6 +206,32 @@ module FdHelper
     tag.span(said.truncate(AUDIT_VALUE), class: "mono")
   end
 
+  DOMAIN_MATCH_LABELS = { "exact" => "exact", "suffix" => "with subdomains" }.freeze
+  DOMAIN_EFFECT_LABELS = { "flag" => "write it down", "hold" => "shush them",
+                           "deactivate" => "deactivate them" }.freeze
+  DOMAIN_EFFECT_TONES = { "flag" => "", "hold" => "state-warn",
+                          "deactivate" => "state-crit" }.freeze
+  SCREEN_TONES = { "flagged" => "state-warn", "held" => "state-warn",
+                   "deactivated" => "state-crit", "failed" => "state-crit" }.freeze
+
+  def domain_match_label(said) = DOMAIN_MATCH_LABELS.fetch(said, said)
+
+  def domain_effect_label(said) = DOMAIN_EFFECT_LABELS.fetch(said, said)
+
+  def domain_match_chip(one)
+    tag.span(domain_match_label(one.match_mode), class: "state")
+  end
+
+  def domain_effect_chip(one)
+    tag.span(domain_effect_label(one.effect),
+      class: "state #{DOMAIN_EFFECT_TONES.fetch(one.effect, '')}".strip)
+  end
+
+  def screen_outcome_chip(screen)
+    tag.span(screen.outcome.tr("_", " "),
+      class: "state #{SCREEN_TONES.fetch(screen.outcome, '')}".strip)
+  end
+
   def session_span(first_at, last_at)
     return "n/a" if first_at.nil? || last_at.nil?
     return on_day(last_at) if first_at.to_date == last_at.to_date
@@ -759,7 +785,8 @@ module FdHelper
     end
   end
 
-  CONFIGURATION_TAB_LABELS = { "automod" => "Automod", "responses" => "Responses" }.freeze
+  CONFIGURATION_TAB_LABELS = { "automod" => "Automod", "domains" => "Domains",
+                              "responses" => "Responses" }.freeze
 
   def configuration_tab_label(key)
     CONFIGURATION_TAB_LABELS.fetch(key) { key.tr("_", " ").capitalize }

@@ -1,7 +1,7 @@
 import logging
 
 from bot.core import session
-from bot.nemo import joiners
+from bot.nemo import joiners, screening
 from bot.nemo.surface import on_event
 
 log = logging.getLogger("bot.nemo")
@@ -17,6 +17,12 @@ def arrived(ctx):
         fresh = joiners.arrived(conn, user)
 
     log.info("nemo: %s joined the workspace%s", user["id"], "" if fresh else ", already known")
+    if not fresh:
+        return user["id"]
+
+    email = ((user.get("profile") or {}).get("email"))
+    with session() as conn:
+        screening.screen(conn, user["id"], email)
     return user["id"]
 
 

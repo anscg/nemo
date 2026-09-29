@@ -35,6 +35,7 @@ Rails.application.routes.draw do
     resources :channels, only: [:index, :show], param: :channel_id
     resource :configuration, only: [:show], controller: "configuration"
     resources :automod_words, only: [:create, :destroy], path: "configuration/automod"
+    resources :blocked_domains, only: [:create, :destroy], path: "configuration/domains"
     post "configuration/responses/autoresponse", to: "responses#autoresponse",
          as: :configuration_autoresponse
     post "configuration/responses/unsub_shield", to: "responses#unsub_shield",
