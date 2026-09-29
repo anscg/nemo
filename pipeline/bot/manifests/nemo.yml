@@ -57,6 +57,7 @@ oauth_config:
       - reactions:read
       - reactions:write
       - users:read
+      - users:read.email
 
 settings:
   event_subscriptions:
@@ -73,6 +74,8 @@ settings:
       - message.channels
       - message.groups
       - reaction_added
+      - team_join
+      - user_change
   interactivity:
     is_enabled: true
   socket_mode_enabled: true

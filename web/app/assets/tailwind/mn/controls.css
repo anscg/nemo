@@ -804,7 +804,7 @@
   th > a.sortable, th > button.sortable, th.sortable > a, th.sortable > button, th.th-sort > a {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 5px;
     color: inherit;
     text-decoration: none;
   }

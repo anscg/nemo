@@ -653,3 +653,49 @@
     .you-facts .fact, .you-extras .fact { border-left: 0; padding-left: 0; }
   }
 }
+
+@layer components {
+  .col-pick { width: 40px; text-align: center; }
+  .pick {
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .data-table tbody tr.is-picked > td {
+    background: color-mix(in oklab, var(--accent) 7%, transparent);
+  }
+
+  .stack:has(> .pickbar:not([hidden])) { padding-bottom: 60px; }
+  .stack:has(> .pickbar:not([hidden])) > .pagebar { display: none; }
+
+  .pickbar {
+    position: sticky;
+    bottom: var(--s-sm);
+    z-index: 6;
+    width: fit-content;
+    max-width: 100%;
+    margin: calc(var(--s-sm) * -1) auto 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
+    background: var(--card);
+    box-shadow: 0 6px 20px color-mix(in oklab, black 30%, transparent);
+  }
+  .pickbar-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2xs);
+    padding: var(--s-2xs) var(--s-2xs) var(--s-2xs) var(--s-sm);
+  }
+  .pickbar-count {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    padding-right: var(--s-2xs);
+    font-size: var(--t-small);
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+  .pickbar-count b { font-size: var(--t-body); color: var(--ink); font-variant-numeric: tabular-nums; }
+}

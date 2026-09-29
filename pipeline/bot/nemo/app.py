@@ -17,6 +17,7 @@ from bot.nemo.surface import (
     autoresponse,  # noqa: F401
     bot_watch,  # noqa: F401
     channel_watch,  # noqa: F401
+    join_watch,  # noqa: F401
     reaction_watch,  # noqa: F401
     thread_destroy,  # noqa: F401
     thread_lock,  # noqa: F401

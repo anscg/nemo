@@ -145,6 +145,35 @@ module FdHelper
     "#{((part.to_f / whole) * 100).round(1)}% of the workspace"
   end
 
+  def joiner_sort_header(label, key, numeric: false)
+    css = ["th-sort"]
+    css << "col-num" if numeric
+    css << (@query.descending? ? "sort-down" : "sort-up") if @query.sorting?(key)
+
+    tag.th(class: css.join(" "), aria: { sort: sort_state(key) }) do
+      link_to fd_joiners_path(@query.sort_params(key)) do
+        concat tag.span(label)
+        concat sort_caret(key)
+      end
+    end
+  end
+
+  JOINER_SOURCE = { "team_join" => "watched them arrive", "by_hand" => "written down by hand",
+                    "cohort" => "from the cohort table" }.freeze
+
+  def joiner_when(row)
+    [row.joined_at.strftime("%-d %b %Y"), JOINER_SOURCE[row.source]].compact.join(" · ")
+  end
+
+  def joiner_standing(row)
+    return tag.span("deactivated", class: "state state-crit") if row.deactivated?
+    return tag.span("clear", class: "state") unless row.guarded?
+
+    safe_join(Fd::MemberGuard.worst_kinds_first(row.kinds).map { |kind|
+      tag.span(action_label(kind).downcase, class: "state state-warn")
+    }, " ")
+  end
+
   def member_sort_header(label, key, numeric: false)
     css = ["th-sort"]
     css << "col-num" if numeric
@@ -253,6 +282,7 @@ module FdHelper
   Stop = Struct.new(:key, :label, :icon, :path, :here, :tally, keyword_init: true)
 
   NAV_HOME = { "fd/fire" => "overview", "fd/members" => "members",
+               "fd/joiners" => "joiners",
                "fd/channels" => "channels", "fd/audits" => "audit",
                "fd/configuration" => "configuration",
                "fd/channel_purges" => "channels" }.freeze
@@ -267,6 +297,7 @@ module FdHelper
       Stop.new(key: "cases", label: "Cases", icon: "shield", path: fd_cases_path,
         tally: Fd::Case.unresolved.not_duplicate.unassigned.count),
       Stop.new(key: "members", label: "Members", icon: "people", path: fd_members_path),
+      Stop.new(key: "joiners", label: "Joiners", icon: "people", path: fd_joiners_path),
       Stop.new(key: "channels", label: "Channels", icon: "channels", path: fd_channels_path)
     ])
   end

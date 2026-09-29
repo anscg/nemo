@@ -10,6 +10,7 @@ module Fd
     UNDONE_IN_SLACK = [DEACTIVATION].freeze
     DATELESS = [DEACTIVATION].freeze
     HOLDS = (KINDS - [DEACTIVATION]).freeze
+    WORST_KINDS = [DEACTIVATION, CHANNEL_BAN, SHUSH].freeze
 
     LIVE = "live".freeze
     LIFTING = "lifting".freeze
@@ -70,6 +71,10 @@ module Fd
       return [] if said.nil?
 
       still_on.for_subject(said).oldest_first.to_a
+    end
+
+    def self.worst_kinds_first(kinds)
+      Array(kinds).uniq.sort_by { |kind| WORST_KINDS.index(kind) || WORST_KINDS.size }
     end
 
     def self.worst_first(guards)

@@ -19,6 +19,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from slack_sdk.errors import SlackApiError
 
+from audit_client import METHODS as AUDIT_METHODS
+from audit_client import AuditApiError, AuditAuthError
+from audit_client import call as audit_call
 from internal_client import InternalApiError, InternalAuthError, InternalClient
 from scim_client import METHODS as SCIM_METHODS
 from scim_client import ScimError
@@ -44,7 +47,9 @@ ALLOWED_METHODS = {
             "conversations.history",
             "conversations.replies",
             "conversations.members",
+            "team.accessLogs",
         }
+        | set(AUDIT_METHODS)
     ),
 }
 
@@ -262,6 +267,17 @@ def call_admin(req: CallRequest):
     return admin_api_call(req.method, req.params).data
 
 
+def call_audit(req: CallRequest):
+    try:
+        return audit_call(req.method, req.params)
+    except AuditAuthError as exc:
+        raise HTTPException(status_code=502, detail=f"invalid_auth: {exc}") from exc
+    except AuditApiError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 def call_scim(req: CallRequest):
     try:
         return scim_call(req.method, req.params)
@@ -314,6 +330,8 @@ def call(req: CallRequest, client: Client = Depends(current_client)):
         )
 
     if req.credential == "admin":
+        if req.method in AUDIT_METHODS:
+            return call_audit(req)
         if req.method in SCIM_METHODS:
             return call_scim(req)
         try:
