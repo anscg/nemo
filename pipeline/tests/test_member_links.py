@@ -86,8 +86,20 @@ def test_a_link_nothing_supports_any_more_is_swept_rather_than_left_standing():
     assert "computed_at <" in links.SWEEP
 
 
-def test_the_crowd_ceiling_keeps_a_cgnat_out_of_the_join_entirely():
-    assert "c.people BETWEEN 2 AND %(ceiling)s" in links.PAIRS_SQL
+def test_the_crowd_ceiling_prunes_before_the_join_not_after_it():
+    for sql in (links.PAIRS_SQL, links.TOGETHER_SQL):
+        pruned = sql.index("BETWEEN 2 AND %(ceiling)s")
+        joined = sql.index("JOIN small b")
+        assert pruned < joined, (
+            "a value thousands of people share must be dropped before the self-join; "
+            "filtering after it materialises n squared rows and the pass never ends")
+        assert "FROM small a" in sql
+
+
+def test_neither_side_of_the_join_reads_the_unpruned_evidence():
+    for sql in (links.PAIRS_SQL, links.TOGETHER_SQL):
+        assert "FROM ev a" not in sql
+        assert "JOIN ev b" not in sql
 
 
 def test_every_signal_the_catalogue_names_can_actually_be_gathered():

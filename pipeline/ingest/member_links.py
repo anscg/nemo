@@ -40,51 +40,57 @@ WITH ev AS ({evidence}),
 crowd AS (
     SELECT value, count(DISTINCT user_id) AS people FROM ev GROUP BY 1
 ),
+keep AS (
+    SELECT value, people FROM crowd WHERE people BETWEEN 2 AND %(ceiling)s
+),
+small AS (
+    SELECT e.user_id, e.value, e.first_seen, e.last_seen
+    FROM ev e JOIN keep k ON k.value = e.value
+),
 whole AS (
     SELECT greatest(count(DISTINCT user_id), 2)::numeric AS people FROM ev
 )
 SELECT least(a.user_id, b.user_id) AS a_user_id,
        greatest(a.user_id, b.user_id) AS b_user_id,
        a.value,
-       c.people,
-       %(weight)s::numeric * rarity((SELECT people FROM whole), c.people) AS score,
+       k.people,
+       %(weight)s::numeric * rarity((SELECT people FROM whole), k.people) AS score,
        least(a.first_seen, b.first_seen) AS first_seen,
        greatest(a.last_seen, b.last_seen) AS last_seen
-FROM ev a
-JOIN ev b ON b.value = a.value AND b.user_id > a.user_id
-JOIN crowd c ON c.value = a.value
-WHERE c.people BETWEEN 2 AND %(ceiling)s
+FROM small a
+JOIN small b ON b.value = a.value AND b.user_id > a.user_id
+JOIN keep k ON k.value = a.value
 """
 
 TOGETHER_SQL = """
 WITH ev AS (
-    SELECT user_id, joined_at FROM fd.member_joins WHERE joined_at IS NOT NULL
-),
-near AS (
-    SELECT least(a.user_id, b.user_id) AS a_user_id,
-           greatest(a.user_id, b.user_id) AS b_user_id,
-           least(a.joined_at, b.joined_at) AS first_seen,
-           greatest(a.joined_at, b.joined_at) AS last_seen,
-           date_trunc('hour', a.joined_at) AS bucket
-    FROM ev a
-    JOIN ev b ON b.user_id > a.user_id
-             AND b.joined_at BETWEEN a.joined_at - make_interval(secs => %(window)s)
-                                 AND a.joined_at + make_interval(secs => %(window)s)
+    SELECT user_id, joined_at, date_trunc('hour', joined_at) AS bucket
+    FROM fd.member_joins WHERE joined_at IS NOT NULL
 ),
 crowd AS (
-    SELECT bucket, count(*) AS pairs FROM near GROUP BY 1
+    SELECT bucket, count(DISTINCT user_id) AS people FROM ev GROUP BY 1
+),
+keep AS (
+    SELECT bucket, people FROM crowd WHERE people BETWEEN 2 AND %(ceiling)s
+),
+small AS (
+    SELECT e.user_id, e.joined_at, e.bucket FROM ev e JOIN keep k ON k.bucket = e.bucket
 ),
 whole AS (
-    SELECT greatest(count(*), 2)::numeric AS people FROM ev
+    SELECT greatest(count(DISTINCT user_id), 2)::numeric AS people FROM ev
 )
-SELECT n.a_user_id, n.b_user_id,
-       to_char(n.first_seen, 'YYYY-MM-DD HH24:MI') AS value,
-       c.pairs AS people,
-       %(weight)s::numeric * rarity((SELECT people FROM whole), c.pairs) AS score,
-       n.first_seen, n.last_seen
-FROM near n
-JOIN crowd c ON c.bucket = n.bucket
-WHERE c.pairs <= %(ceiling)s
+SELECT least(a.user_id, b.user_id) AS a_user_id,
+       greatest(a.user_id, b.user_id) AS b_user_id,
+       to_char(least(a.joined_at, b.joined_at), 'YYYY-MM-DD HH24:MI') AS value,
+       k.people,
+       %(weight)s::numeric * rarity((SELECT people FROM whole), k.people) AS score,
+       least(a.joined_at, b.joined_at) AS first_seen,
+       greatest(a.joined_at, b.joined_at) AS last_seen
+FROM small a
+JOIN small b ON b.bucket = a.bucket AND b.user_id > a.user_id
+            AND b.joined_at BETWEEN a.joined_at - make_interval(secs => %(window)s)
+                                AND a.joined_at + make_interval(secs => %(window)s)
+JOIN keep k ON k.bucket = a.bucket
 """
 
 RARITY = """
