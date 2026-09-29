@@ -306,9 +306,9 @@ module Fd
     SQL
 
     SEEN_COLUMNS =
-      ", seen.ua_app AS seen_app, seen.country AS seen_country, " \
+      ", seen.ua_app AS seen_app, place.country AS seen_country, " \
       "coalesce(cohort.people, 0) AS seen_people, " \
-      "host(seen.ip) AS ip, seen.region AS region, place.isp AS isp, " \
+      "host(seen.ip) AS ip, place.region AS region, place.isp AS isp, " \
       "seen.ua_os AS seen_os, seen.ua AS raw_agent, seen.at AS seen_at".freeze
     BLIND_SEEN =
       ", NULL::text AS seen_app, NULL::text AS seen_country, 0 AS seen_people, " \
@@ -325,9 +325,9 @@ module Fd
         LIMIT 1
       ) seen ON true
       LEFT JOIN LATERAL (
-        SELECT l.isp
+        SELECT l.country, l.region, l.isp
         FROM fd.login_event l
-        WHERE l.user_id = j.user_id AND l.isp IS NOT NULL
+        WHERE l.user_id = j.user_id AND l.country IS NOT NULL
         ORDER BY l.at DESC
         LIMIT 1
       ) place ON true

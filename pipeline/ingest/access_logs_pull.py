@@ -18,8 +18,8 @@ SELECT at FROM fd.login_event WHERE source = 'access_logs' ORDER BY at DESC LIMI
 ROW_SQL = """
 INSERT INTO fd.login_event
     (user_id, at, source, action, ip, ua, ua_app, ua_os,
-     country, region, isp, seen)
-VALUES (%s, %s, 'access_logs', 'access_log', %s, %s, %s, %s, %s, %s, %s, %s)
+     country, region, isp, seen, ua_read_at)
+VALUES (%s, %s, 'access_logs', 'access_log', %s, %s, %s, %s, %s, %s, %s, %s, now())
 ON CONFLICT (user_id, at, source) DO UPDATE SET
     ip = coalesce(EXCLUDED.ip, fd.login_event.ip),
     ua = coalesce(EXCLUDED.ua, fd.login_event.ua),

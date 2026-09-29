@@ -257,6 +257,22 @@ class FdJoinerCardTest < ActionDispatch::IntegrationTest
     assert_match "Serbia", response.body
   end
 
+  test "the country survives a newer sign-in that carries none" do
+    as_pipeline(<<~SQL.squish, "UJOIN")
+      INSERT INTO fd.login_event (user_id, at, source, action, ip, ua, ua_app, ua_os)
+      VALUES (?, now() + interval '1 minute', 'audit_logs', 'user_login',
+              '203.0.113.9'::inet, 'x', 'Chrome 1', 'Linux')
+      ON CONFLICT DO NOTHING
+    SQL
+
+    get fd_joiner_path("UJOIN")
+    assert_response :success
+    assert_match "Serbia", response.body,
+      "the audit log carries no country, so it must not hide the one the access log has"
+    assert_match "TELEKOM SRBIJA", response.body
+    assert_match "203.0.113.9", response.body, "the address still comes from the newest row"
+  end
+
   test "the card is a frame the page can swap in" do
     get fd_joiner_path("UJOIN")
     assert_select %(turbo-frame[id="joiner-card"])

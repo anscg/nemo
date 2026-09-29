@@ -7,14 +7,17 @@ BATCH = 5000
 UNREAD = """
 SELECT user_id, at, source, ua
 FROM fd.login_event
-WHERE ua IS NOT NULL AND (ua_app IS NULL OR ua_os IS NULL)
+WHERE ua IS NOT NULL AND ua_read_at IS NULL
 ORDER BY at DESC
 LIMIT %s
 """
 
 REREAD = """
 UPDATE fd.login_event
-SET ua_app = %s, ua_os = %s, updated_at = now()
+SET ua_app = coalesce(%s, ua_app),
+    ua_os = coalesce(%s, ua_os),
+    ua_read_at = now(),
+    updated_at = now()
 WHERE user_id = %s AND at = %s AND source = %s
 """
 
@@ -27,13 +30,10 @@ def pass_over(conn, batch=BATCH):
     read = []
     for user_id, at, source, ua in rows:
         seen = useragent.parse(ua)
-        if seen["ua_app"] is None and seen["ua_os"] is None:
-            continue
         read.append((seen["ua_app"], seen["ua_os"], user_id, at, source))
 
-    if read:
-        with conn.cursor() as cur:
-            cur.executemany(REREAD, read)
+    with conn.cursor() as cur:
+        cur.executemany(REREAD, read)
     conn.commit()
     return len(read)
 

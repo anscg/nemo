@@ -50,8 +50,8 @@ ON CONFLICT (id) DO NOTHING
 
 LOGIN_SQL = """
 INSERT INTO fd.login_event
-    (user_id, at, source, action, ip, ua, ua_app, ua_os, session_id)
-VALUES (%s, %s, 'audit_logs', %s, %s, %s, %s, %s, %s)
+    (user_id, at, source, action, ip, ua, ua_app, ua_os, session_id, ua_read_at)
+VALUES (%s, %s, 'audit_logs', %s, %s, %s, %s, %s, %s, now())
 ON CONFLICT (user_id, at, source) DO UPDATE SET
     ip = coalesce(EXCLUDED.ip, fd.login_event.ip),
     ua = coalesce(EXCLUDED.ua, fd.login_event.ua),

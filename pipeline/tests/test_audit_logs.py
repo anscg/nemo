@@ -215,6 +215,25 @@ def test_the_backfill_walks_the_channel_actions_as_well_as_the_logins():
     assert len(said) <= pull.MOST_ACTIONS, "slack takes only so many actions in one call"
 
 
+def test_an_agent_is_read_once_even_when_it_names_no_system():
+    from ingest import useragent_reparse
+
+    assert "ua_read_at IS NULL" in useragent_reparse.UNREAD
+    assert "ua_app IS NULL" not in useragent_reparse.UNREAD, (
+        "a runtime names no system, so a null ua_os is a finished read, not a pending one; "
+        "matching on it re-reads the newest rows forever and never reaches the backlog")
+    assert "ua_read_at = now()" in useragent_reparse.REREAD
+    assert "coalesce(%s, ua_app)" in useragent_reparse.REREAD, "a read must not clear what it has"
+
+
+def test_a_landed_agent_counts_as_already_read():
+    from ingest import access_logs_pull
+
+    assert "ua_read_at" in pull.LOGIN_SQL and "now()" in pull.LOGIN_SQL
+    assert "ua_read_at" in access_logs_pull.ROW_SQL, \
+        "what the puller parses needs no second pass"
+
+
 def test_the_access_log_walk_stops_at_what_we_already_hold():
     from ingest import access_logs_pull
 
@@ -514,10 +533,9 @@ def test_the_slack_phone_apps_are_told_apart_from_a_browser_on_the_phone():
 def test_an_agent_landed_before_the_reader_knew_it_is_read_again():
     from ingest import useragent_reparse
 
-    assert "ua_app IS NULL OR ua_os IS NULL" in useragent_reparse.UNREAD
     assert "ua IS NOT NULL" in useragent_reparse.UNREAD
 
     said = (pathlib.Path(__file__).parents[2] / "db" / "migrations"
-            / "0150_unread_agents.sql").read_text()
+            / "0152_agents_we_have_read.sql").read_text()
     assert "login_event_unread_agent_idx" in said
-    assert "WHERE ua IS NOT NULL" in said, "the sweep must be free once it has drained"
+    assert "ua_read_at IS NULL" in said, "the sweep must be free once it has drained"
