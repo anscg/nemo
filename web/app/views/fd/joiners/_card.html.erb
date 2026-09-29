@@ -23,7 +23,7 @@
         <dt>Email</dt>
         <dd>
           <% if row.email.present? %>
-            <span class="mono"><%= row.email %></span>
+            <%= plain_email(row.email) %>
             <span class="sub2">&middot;</span>
             <span class="sub2"><%= number_with_delimiter(row.domain_people) %></span>
             <% if row.lone_domain? %>

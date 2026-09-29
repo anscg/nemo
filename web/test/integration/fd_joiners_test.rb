@@ -273,6 +273,25 @@ class FdJoinerCardTest < ActionDispatch::IntegrationTest
     assert_match "203.0.113.9", response.body, "the address still comes from the newest row"
   end
 
+  test "an address is wrapped so cloudflare leaves it alone" do
+    get fd_joiner_path("UJOIN")
+    assert_match "<!--email_off-->", response.body
+    assert_match "kid@throwaway.example", response.body
+
+    body = response.body
+    off = body.index("<!--email_off-->")
+    on = body.index("<!--/email_off-->")
+    assert off < body.index("kid@throwaway.example")
+    assert on > body.index("kid@throwaway.example"),
+      "cloudflare only skips an address sitting between the two markers"
+  end
+
+  test "the page wraps its addresses too, since turbo swaps it in undecoded" do
+    get fd_joiners_path
+    assert_match "<!--email_off-->", response.body
+    assert_match "kid@throwaway.example", response.body
+  end
+
   test "the card is a frame the page can swap in" do
     get fd_joiner_path("UJOIN")
     assert_select %(turbo-frame[id="joiner-card"])

@@ -46,13 +46,22 @@ module FdHelper
     "#{SLACK_TEAM_URL}/#{user_id}"
   end
 
+  CF_EMAIL_OFF = "<!--email_off-->".html_safe
+  CF_EMAIL_ON = "<!--/email_off-->".html_safe
+
+  def plain_email(address, css: "mono")
+    return nil if address.blank?
+
+    safe_join([CF_EMAIL_OFF, tag.span(address, class: css), CF_EMAIL_ON])
+  end
+
   def identity_line(identity)
     return locked_note("Nothing on file") if identity.nil?
     return locked_note("Not yours to read") if identity.refused?
     return locked_note("Identity purged") if identity.purged?
     return locked_note("Email not collected yet") if identity.email.blank?
 
-    locked_note(identity.email)
+    tag.span(class: "locked") { plain_email(identity.email, css: nil) }
   end
 
   def locked_note(text)
