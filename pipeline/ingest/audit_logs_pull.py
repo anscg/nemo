@@ -246,9 +246,9 @@ def land(conn, entries, source_key, ours, counts):
 def walk(client, conn, source_key, counts, oldest=None, latest=None, actions=None,
          start_cursor=None, on_cursor=None):
     asked = {}
-    if oldest is not None:
+    if oldest is not None and not start_cursor:
         asked["oldest"] = int(oldest.timestamp())
-    if latest is not None:
+    if latest is not None and not start_cursor:
         asked["latest"] = int(latest.timestamp())
     held = usable(actions)
     if actions and not held:
@@ -306,19 +306,31 @@ def watermark(conn):
     return row[0] if row and row[0] else None
 
 
+def drop_cursor(conn, source_key):
+    save_cursor(conn, source_key, "")
+    conn.commit()
+
+
 def tail(conn, client=None):
     client = client or ProxyClient.for_source(TAIL)
     since = watermark(conn) or datetime.now(UTC) - timedelta(hours=FIRST_TAIL_HOURS)
     oldest = since - timedelta(seconds=LAP_SECONDS)
+    held = get_cursor(conn, TAIL)
 
-    with ingest_run(conn, TAIL) as counts:
-        held = get_cursor(conn, TAIL)
-        landed, seated = walk(
-            client, conn, TAIL, counts, oldest=oldest, actions=tail_actions(),
-            start_cursor=held,
-            on_cursor=lambda cursor: save_cursor(conn, TAIL, cursor or ""),
-        )
-        save_cursor(conn, TAIL, "")
+    try:
+        with ingest_run(conn, TAIL) as counts:
+            landed, seated = walk(
+                client, conn, TAIL, counts, oldest=oldest, actions=tail_actions(),
+                start_cursor=held,
+                on_cursor=lambda cursor: save_cursor(conn, TAIL, cursor or ""),
+            )
+            save_cursor(conn, TAIL, "")
+    except ProxyError as failure:
+        if held and turned_down(failure):
+            drop_cursor(conn, TAIL)
+            print(f"{TAIL}: slack would not take the saved cursor, dropped it "
+                  f"so the next pass starts from the watermark")
+        raise
 
     print(f"{TAIL}: {landed} event(s), {seated} login(s) since {oldest:%Y-%m-%d %H:%M}")
     return landed

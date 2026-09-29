@@ -5,7 +5,7 @@ import pytest
 
 from ingest import audit_logs_pull as pull
 from lib import useragent
-from lib.proxy_client import ProxyError
+from lib.proxy_client import ProxyError, stamped
 
 WHO = "U1"
 APP = "A0BJDDB42N7"
@@ -219,6 +219,76 @@ def test_the_tail_laps_back_a_second_so_the_seam_cannot_drop_an_event():
     assert pull.LAP_SECONDS >= 1
 
 
+def test_a_cursor_is_resumed_on_its_own_because_it_already_holds_the_window():
+    held = []
+
+    class Client:
+        def paginate(self, _method, asked, *_args, **kwargs):
+            held.append((dict(asked), kwargs.get("start_cursor")))
+            return []
+
+    pull.walk(Client(), Conn(), "k", Counts(), oldest=dt.datetime(2026, 9, 29, tzinfo=dt.UTC),
+              start_cursor="abc")
+    asked, cursor = held[0]
+    assert cursor == "abc"
+    assert "oldest" not in asked, "a cursor and a window slack did not pair are refused"
+
+    pull.walk(Client(), Conn(), "k", Counts(), oldest=dt.datetime(2026, 9, 29, tzinfo=dt.UTC))
+    assert "oldest" in held[1][0], "with no cursor the window is what bounds the walk"
+
+
+def test_a_cursor_slack_will_not_take_is_dropped_so_the_tail_can_recover(monkeypatch):
+    import contextlib
+
+    cleared = []
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "stale")
+    monkeypatch.setattr(pull, "save_cursor",
+                        lambda _conn, key, value: cleared.append((key, value)))
+    monkeypatch.setattr(pull, "watermark", lambda _conn: None)
+
+    @contextlib.contextmanager
+    def bookkeeping(*_args, **_kwargs):
+        yield Counts()
+
+    monkeypatch.setattr(pull, "ingest_run", bookkeeping)
+
+    def refuse(*_args, **_kwargs):
+        raise stamped(ProxyError("audit 400: refused"), 400, False)
+
+    monkeypatch.setattr(pull, "walk", refuse)
+
+    with pytest.raises(ProxyError):
+        pull.tail(Conn(), client=object())
+
+    assert (pull.TAIL, "") in cleared, "a wedged cursor must not survive the failed run"
+
+
+def test_a_failure_that_is_not_a_refusal_leaves_the_cursor_where_it_was(monkeypatch):
+    import contextlib
+
+    cleared = []
+    monkeypatch.setattr(pull, "get_cursor", lambda _conn, _key: "good")
+    monkeypatch.setattr(pull, "save_cursor",
+                        lambda _conn, key, value: cleared.append((key, value)))
+    monkeypatch.setattr(pull, "watermark", lambda _conn: None)
+
+    @contextlib.contextmanager
+    def bookkeeping(*_args, **_kwargs):
+        yield Counts()
+
+    monkeypatch.setattr(pull, "ingest_run", bookkeeping)
+
+    def blew_up(*_args, **_kwargs):
+        raise stamped(ProxyError("audit 500: slack fell over"), 500, False)
+
+    monkeypatch.setattr(pull, "walk", blew_up)
+
+    with pytest.raises(ProxyError):
+        pull.tail(Conn(), client=object())
+
+    assert cleared == [], "a passing cursor must survive a wobble at slack's end"
+
+
 class Conn:
     def __init__(self):
         self.ran = []
@@ -244,6 +314,9 @@ class Conn:
 
     def fetchone(self):
         return (0,)
+
+    def fetchall(self):
+        return []
 
     def did(self, mark):
         return [args for sql, args in self.ran if mark in sql]
