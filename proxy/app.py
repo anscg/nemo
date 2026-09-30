@@ -76,6 +76,14 @@ WRITE_METHODS = {
     ),
 }
 
+# how one post did: viewers, clicks, reactions and the curves behind slack's
+# own message activity panel. a read, kept apart from the writes so it is
+# never logged as one
+ACTIVITY_METHODS = {"internal": frozenset({"insights.messageStats"})}
+
+NEMO_METHODS = {**WRITE_METHODS, **ACTIVITY_METHODS}
+WEB_METHODS["internal"] = WEB_METHODS["internal"] | ACTIVITY_METHODS["internal"]
+
 CREDENTIALS = ("internal", "admin")
 
 
@@ -89,7 +97,7 @@ class Client:
 CLIENTS = (
     ("pipeline", "PROXY_TOKEN", ALLOWED_METHODS, ALLOWED_FILE_METHODS),
     ("web", "PROXY_TOKEN_WEB", WEB_METHODS, frozenset()),
-    ("nemo", "PROXY_TOKEN_NEMO", WRITE_METHODS, frozenset()),
+    ("nemo", "PROXY_TOKEN_NEMO", NEMO_METHODS, frozenset()),
 )
 
 WRITES = frozenset().union(*WRITE_METHODS.values())

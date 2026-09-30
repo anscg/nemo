@@ -31,6 +31,7 @@ LIMITS = {
     ("nemo", "admin", "chat.delete"): (TIER3, 60, 30),
     ("nemo", "admin", "users.info"): (TIER4, 0),
     ("nemo", "admin"): (TIER3, 60),
+    ("nemo", "internal"): (TIER2, 20),
     ("pipeline", "admin"): (TIER4, 500),
     ("pipeline", "internal"): (TIER3, 100),
     ("web", "internal"): (TIER2, 40),

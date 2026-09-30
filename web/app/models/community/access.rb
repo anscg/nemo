@@ -10,6 +10,8 @@ module Community
       "analytics.member.read" => "member.read",
       "analytics.channel.read" => "channel.read",
       "analytics.channel.share" => "channel.share",
+      "analytics.message.show" => "message.show",
+      "analytics.message.read" => "message.read",
       "analytics.grant" => "access.grant",
       "ops.engine" => "engine.manage",
       "ops.channel.backfill" => "channel.backfill"
