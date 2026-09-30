@@ -417,8 +417,9 @@ module Fd
       WHERE false
     SQL
 
-    def body(where = "true")
+    def body(where = "true", capped: false)
       held = branches.presence || [NOTHING]
+      held = held.map { |one| "(SELECT * FROM (#{one}) one LIMIT #{COUNT_CEILING + 1})" } if capped
 
       "WITH held AS (\n#{held.join("\nUNION ALL\n")}\n) SELECT * FROM held WHERE #{where}"
     end
@@ -490,7 +491,7 @@ module Fd
     end
 
     def counting_sql
-      "#{body.sub(/SELECT \* FROM held WHERE true\z/, '')}#{COUNTS}"
+      "#{body(capped: true).sub(/SELECT \* FROM held WHERE true\z/, '')}#{COUNTS}"
     end
 
     def held_json(value)
