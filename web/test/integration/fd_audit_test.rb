@@ -372,4 +372,20 @@ class FdAuditTest < ActionDispatch::IntegrationTest
     assert_select ".audit-verb", text: "resolved"
     assert_select ".view", text: /Fire Engine/
   end
+
+  test "counting never drags the payload columns through the cap" do
+    query = Fd::AuditQuery.new({}, actor: @me)
+
+    [query.send(:count_sql), query.send(:counting_sql)].each do |sql|
+      assert_match(/SELECT source FROM \(/, sql,
+        "a count only needs the source, and detoasting jsonb for 10k rows is what timed out")
+      assert_no_match(/SELECT \* FROM \(SELECT/, sql)
+    end
+  end
+
+  test "the total is capped per branch, like the view counts" do
+    query = Fd::AuditQuery.new({}, actor: @me)
+
+    assert_match(/LIMIT #{Fd::AuditQuery::COUNT_CEILING + 1}\)/, query.send(:count_sql))
+  end
 end
