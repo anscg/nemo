@@ -28,7 +28,7 @@ module Fd
 
     def entries(only = "all")
       wanted = KINDS.key?(only) ? only : "all"
-      all = case_entries + logged_entries + action_entries + note_entries
+      all = case_entries + logged_entries + action_entries + guard_entries + note_entries
       all = all.select { |entry| entry.kind == wanted } unless wanted == "all"
       all.sort_by { |entry| [-entry.at.to_i, -entry.case_id.to_i] }
     end
@@ -106,6 +106,41 @@ module Fd
       end
     end
 
+    def guard_entries
+      record.guards_on_no_case.flat_map do |guard|
+        list = [
+          Entry.new(
+            at: guard.opened_at,
+            title: guard_label(guard),
+            kind: "actions",
+            word: "action",
+            who: guard.opened_by,
+            mark: "act",
+            state: guard.lifted_at ? "reversed" : nil,
+            detail: guard_detail(guard),
+            case_id: nil
+          )
+        ]
+
+        if guard.lifted_at
+          list << Entry.new(
+            at: guard.lifted_at,
+            title: "#{guard_label(guard)} lifted",
+            kind: "actions",
+            word: "reversal",
+            who: guard.lifted_by,
+            mark: "act",
+            state: "reversed",
+            detail: ["on no case", guard.lift_reason,
+                     ("by #{names[guard.lifted_by]}" if guard.lifted_by)].compact.join(" · "),
+            case_id: nil
+          )
+        end
+
+        list
+      end
+    end
+
     def note_entries
       record.notes.map do |note|
         Entry.new(
@@ -146,6 +181,19 @@ module Fd
       parts = [kase.category_key&.tr("_", " ")]
       parts << "they were not the subject"
       parts.compact.join(" · ")
+    end
+
+    def guard_label(guard)
+      FdHelper::ACTION_LABELS.fetch(guard.kind, guard.kind.tr("_", " ").capitalize)
+    end
+
+    def guard_detail(guard)
+      parts = ["on no case"]
+      parts << "in #{guard.channel_id}" if guard.channel_scoped?
+      parts << "by #{names[guard.opened_by]}"
+      parts << "lifts #{guard.expires_at.strftime('%-d %b')}" if guard.expires_at
+      parts << guard.reason if guard.reason.present?
+      parts.join(" · ")
     end
 
     def action_detail(action)

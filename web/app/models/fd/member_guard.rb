@@ -46,7 +46,8 @@ module Fd
 
     scope :still_on, -> { where(state: STILL_ON) }
     scope :live, -> { where(state: LIVE) }
-    scope :orphaned, -> { live.where(case_id: nil) }
+    scope :on_no_case, -> { where(case_id: nil) }
+    scope :orphaned, -> { live.on_no_case }
     scope :stuck, -> { where(carry: FAILED) }
     scope :oldest_first, -> { order(:opened_at, :id) }
     scope :for_subject, ->(subject_id) { where(subject_id: subject_id) }
