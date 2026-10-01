@@ -1,8 +1,9 @@
+import datetime as dt
 import logging
 import re
 
 from bot.core import access, audit, richtext, session
-from bot.nemo import casework, channel, record
+from bot.nemo import casework, channel, memberguards, record
 from bot.nemo.cards import help as helping
 from bot.nemo.cards import report
 
@@ -12,25 +13,37 @@ COMMAND = "/nemo"
 LOOKUP = "lookup"
 NOTE = "note"
 OPEN = "open"
+SHUSH = "shush"
 OPEN_RECORD = "open_record"
 
-ABOUT_SOMEBODY = (LOOKUP, NOTE, OPEN)
-NEEDS_WORDS = (NOTE, OPEN)
+ABOUT_SOMEBODY = (LOOKUP, NOTE, OPEN, SHUSH)
+NEEDS_WORDS = (NOTE, OPEN, SHUSH)
 
 WHO = re.compile(r"<@([UW][A-Z0-9]+)(?:\|[^>]*)?>")
 CASE = re.compile(r"\A#?(\d+)\Z")
 MEMBER_ID = re.compile(r"\A[UW][A-Z0-9]{2,}\Z")
+FOR_A_WHILE = re.compile(r"\A(\d{1,3})([dw])\Z", re.IGNORECASE)
+ON_A_DATE = re.compile(r"\A(\d{4})-(\d{2})-(\d{2})\Z")
+
+LONGEST_DAYS = 365
 
 ASK_FOR_SOMEBODY = {
     LOOKUP: "Name somebody: */nemo lookup @them*",
     NOTE: "Name somebody: */nemo note @them what you found*",
     OPEN: "Name somebody: */nemo open @them what happened*",
+    SHUSH: "Name somebody: */nemo shush @them 3d why*",
 }
 
 ASK_FOR_WORDS = {
     NOTE: "Say what you found: */nemo note @them what you found*",
     OPEN: "Say what happened: */nemo open @them what happened*",
+    SHUSH: "Say how long and why: */nemo shush @them 3d why*",
 }
+
+ASK_FOR_TIME = (
+    "Say how long it runs first: */nemo shush @them 3d why*. "
+    f"Days or weeks, up to {LONGEST_DAYS} days, or a date like 2026-10-15."
+)
 
 
 def asked(text):
@@ -54,6 +67,33 @@ def asked(text):
     who = found.group(1)
     body = re.sub(r"\s+", " ", rest[: found.start()] + " " + rest[found.end() :]).strip()
     return verb, (who if MEMBER_ID.match(who) else None), body or None
+
+
+def ends_on(said):
+    found = FOR_A_WHILE.match(said)
+    if found:
+        days = int(found.group(1)) * (7 if found.group(2).lower() == "w" else 1)
+        if not 1 <= days <= LONGEST_DAYS:
+            return None
+        return dt.date.today() + dt.timedelta(days=days)
+
+    found = ON_A_DATE.match(said)
+    if not found:
+        return None
+
+    try:
+        on = dt.date(int(found.group(1)), int(found.group(2)), int(found.group(3)))
+    except ValueError:
+        return None
+    return on if on > dt.date.today() else None
+
+
+def for_how_long(body):
+    first, _, rest = (body or "").partition(" ")
+    on = ends_on(first)
+    if on is None:
+        return None, None
+    return on, re.sub(r"\s+", " ", rest).strip() or None
 
 
 def said_only(text):
@@ -138,6 +178,7 @@ NEEDED = {
     LOOKUP: "case.read",
     NOTE: "member.note",
     OPEN: "case.open",
+    SHUSH: "member.guard",
     "case": "case.read",
 }
 
@@ -147,6 +188,20 @@ def already_open(user_id, numbers):
     return (
         f"<@{user_id}> already has an open case, {said}. "
         "Add what you found to that one instead."
+    )
+
+
+def shushed(user_id, on):
+    return (
+        f"shush held on <@{user_id}> until {on.strftime('%-d %b')}, on no case. "
+        "Log it on a case if there is one."
+    )
+
+
+def already_shushed(user_id):
+    return (
+        f"<@{user_id}> is already under a shush. "
+        "Lift it or run it longer in Fire Engine."
     )
 
 
@@ -196,6 +251,20 @@ def register(app):
                 answer = said_only(
                     f"noted about <@{wanted}>, and it follows them to every case"
                 )
+            elif verb == SHUSH:
+                on, why = for_how_long(body)
+                if on is None:
+                    answer = said_only(ASK_FOR_TIME)
+                elif not why:
+                    answer = said_only(ASK_FOR_WORDS[SHUSH])
+                else:
+                    guard_id = memberguards.open_guard(
+                        conn, memberguards.SHUSH, wanted, user_id, why,
+                        expires_at=f"{on} 23:59:59",
+                    )
+                    answer = said_only(
+                        shushed(wanted, on) if guard_id else already_shushed(wanted)
+                    )
             elif verb == OPEN:
                 held = casework.open_about(conn, wanted)
                 if held:

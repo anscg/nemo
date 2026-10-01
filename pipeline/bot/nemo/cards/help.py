@@ -37,6 +37,14 @@ WRITING = (
     ),
 )
 
+HOLDING = (
+    "Holding somebody",
+    (
+        ("member.guard", "/nemo shush @somebody 3d why",
+         "a shush with no case behind it, until that date"),
+    ),
+)
+
 THREAD = (
     "In a case thread",
     (
@@ -59,7 +67,7 @@ CARD = (
     ),
 )
 
-SECTIONS = (LOOKING, WRITING, THREAD, CARD)
+SECTIONS = (LOOKING, WRITING, HOLDING, THREAD, CARD)
 
 
 def line(said, note):
