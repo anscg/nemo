@@ -1,5 +1,8 @@
 import datetime as dt
 import logging
+import time
+
+from slack_sdk.errors import SlackApiError
 
 from bot.core import audit, session
 from bot.nemo import activity, channel
@@ -14,6 +17,25 @@ NOT_A_POST = "That is a reply. Activity is counted on top-level posts only."
 NOT_SHOWN = "This channel does not show how posts did."
 NOT_YOURS = "That post is not yours."
 NOT_NOW = "Slack would not say how that post did just now. Try again in a minute."
+
+NO_FILE = "slack_file"
+FILE_SETTLES = 0.8
+FILE_TRIES = 3
+
+
+def filled(client, view_id, shown, plain):
+    """Slack takes a moment to make an uploaded chart usable in a block, and
+    refuses the whole view until it has. Wait it out, then go without it"""
+    for attempt in range(FILE_TRIES):
+        last = attempt == FILE_TRIES - 1
+        try:
+            return client.views_update(view_id=view_id, view=plain if last else shown)
+        except SlackApiError as failure:
+            if NO_FILE not in str(failure):
+                raise
+            log.warning("activity: slack would not take the chart yet: %s", failure)
+            time.sleep(FILE_SETTLES)
+    return None
 
 
 def is_reply(message):
@@ -51,23 +73,22 @@ def asked(ctx):
     # the trigger dies three seconds after the click, so the modal opens
     # before slack is asked and fills in once it answers
     opened = ctx.client.views_open(trigger_id=ctx.trigger_id, view=card.reading())
-    view_id = (opened.get("view") or {}).get("id") if isinstance(opened, dict) else None
+    view_id = ((opened or {}).get("view") or {}).get("id")
 
     stats = activity.fetch(ctx.channel_id, ts)
     if stats is None:
-        shown = card.sorry(NOT_NOW)
+        shown = plain = card.sorry(NOT_NOW)
     else:
         posted_at = (found or {}).get("posted_at") or dt.datetime.fromtimestamp(float(ts), dt.UTC)
         file_id, span = activity.chart(ctx.client, stats["curves"], posted_at, stats["viewers"])
-        shown = card.view(
-            ctx.channel_id, ts, author_id, message.get("text"), stats,
-            found=found, crowd=crowd,
-            chart=(file_id, span) if file_id else None,
-            activity_url=channel.app_url(f"/messages/{ctx.channel_id}/{ts}"),
-        )
+        said = (ctx.channel_id, ts, author_id, message.get("text"), stats)
+        kept = {"found": found, "crowd": crowd,
+                "activity_url": channel.app_url(f"/messages/{ctx.channel_id}/{ts}")}
+        shown = card.view(*said, chart=(file_id, span) if file_id else None, **kept)
+        plain = card.view(*said, **kept)
 
     if view_id:
-        ctx.client.views_update(view_id=view_id, view=shown)
+        filled(ctx.client, view_id, shown, plain)
     log.info("nemo: %s read how %s/%s did", ctx.user_id, ctx.channel_id, ts)
     return stats
 

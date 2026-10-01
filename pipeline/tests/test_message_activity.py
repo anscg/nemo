@@ -1,6 +1,7 @@
 import datetime as dt
 
 import pytest
+from slack_sdk.errors import SlackApiError
 
 from bot.core import access
 from bot.nemo import activity, surface
@@ -130,19 +131,40 @@ def test_replies_read_off_the_archive_row():
     assert card.replies_line({"reply_count": 0, "reply_users_count": 0}) == "none"
 
 
+class Answer:
+    """What the slack sdk hands back: not a dict, but it reads like one"""
+
+    def __init__(self, data):
+        self.data = data
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def get(self, key, fallback=None):
+        return self.data.get(key, fallback)
+
+
 class Slack:
-    def __init__(self):
+    def __init__(self, refuses_the_file=0):
         self.opened = []
         self.updated = []
         self.ephemeral = []
+        self.refuses_the_file = refuses_the_file
 
     def views_open(self, **asked):
         self.opened.append(asked)
-        return {"view": {"id": "V1"}}
+        return Answer({"view": {"id": "V1"}})
 
     def views_update(self, **asked):
         self.updated.append(asked)
-        return {"ok": True}
+        if self.refuses_the_file > 0:
+            self.refuses_the_file -= 1
+            raise SlackApiError(
+                "invalid_arguments: [ERROR] invalid slack file "
+                "[json-pointer:view/blocks/5/slack_file.id/slack_file]",
+                Answer({"ok": False, "error": "invalid_arguments"}),
+            )
+        return Answer({"ok": True})
 
     def chat_postEphemeral(self, **asked):
         self.ephemeral.append(asked)
@@ -216,6 +238,34 @@ def test_the_author_gets_a_modal_that_fills_in_once_slack_answers(monkeypatch):
     assert filled["view"]["title"]["text"] == card.TITLE
     fields = [one["text"] for one in filled["view"]["blocks"][3]["fields"]]
     assert fields[4] == "*Replies*\n8 from 5 people"
+
+
+def test_a_chart_slack_has_not_finished_taking_is_tried_again(monkeypatch):
+    hold(monkeypatch, stats=activity.shaped(STATS), landed=(8, 5, None))
+    monkeypatch.setattr(activity, "chart", lambda *said: ("F1", "1d"))
+    ctx = clicked()
+    ctx.client.refuses_the_file = 1
+    monkeypatch.setattr(message_activity.time, "sleep", lambda _: None)
+
+    message_activity.asked(ctx)
+
+    assert len(ctx.client.updated) == 2, "it waits and puts the same card up again"
+    assert ctx.client.updated[1]["view"] == ctx.client.updated[0]["view"]
+    assert any(one["type"] == "image" for one in ctx.client.updated[1]["view"]["blocks"])
+
+
+def test_a_chart_slack_keeps_refusing_leaves_the_numbers_standing(monkeypatch):
+    hold(monkeypatch, stats=activity.shaped(STATS), landed=(8, 5, None))
+    monkeypatch.setattr(activity, "chart", lambda *said: ("F1", "1d"))
+    ctx = clicked()
+    ctx.client.refuses_the_file = message_activity.FILE_TRIES
+    monkeypatch.setattr(message_activity.time, "sleep", lambda _: None)
+
+    message_activity.asked(ctx)
+
+    last = ctx.client.updated[-1]["view"]
+    assert not any(one["type"] == "image" for one in last["blocks"]), "the chart is dropped"
+    assert last["title"]["text"] == card.TITLE, "the numbers still fill the modal in"
 
 
 def test_when_slack_will_not_answer_the_modal_says_so(monkeypatch):
