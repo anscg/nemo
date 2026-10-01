@@ -7,7 +7,6 @@ module Analytics
       true
     end
 
-    # the author scope reads this
     def author = author_id
 
     def self.post(channel_id, ts)

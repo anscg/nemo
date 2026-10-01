@@ -307,7 +307,9 @@ def file(req: CallRequest, client: Client = Depends(current_client)):
             detail=f"method not allowed for file transfer by {client.name}: {req.method}",
         )
 
-    refused = budget.take(client.name, "admin", req.method)
+    refused = budget.take(client.name,
+                          "internal" if req.method in FILE_READ_METHODS else "admin",
+                          req.method)
     if refused:
         wait, label = refused
         raise HTTPException(
@@ -318,8 +320,7 @@ def file(req: CallRequest, client: Client = Depends(current_client)):
 
     if req.method in FILE_READ_METHODS:
         try:
-            body, kind = read_file(req.params, lambda one: admin_api_call("files.info",
-                                                                         {"file": one}).data)
+            body, kind = read_file(req.params)
         except FileError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         return Response(content=body, media_type=kind)

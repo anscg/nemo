@@ -67,7 +67,6 @@ module Admin
 
     SHOWN = %w[on off].freeze
 
-    # whether an author may ask nemo how their own post in this channel did
     def activity
       return refuse("analytics.message.show") unless may_community?("analytics.message.show")
 

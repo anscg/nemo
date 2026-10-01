@@ -8,13 +8,28 @@ module Slack
     DEEPEST = 5
     OPENABLE = ["http://", "https://"].freeze
 
-    def self.for(said, names: {}, channels: {})
-      new(names, channels).said(said || {})
+    def self.for(said, names: {}, channels: {}, emoji: {})
+      new(names, channels, emoji).said(said || {})
     end
 
-    def initialize(names = {}, channels = {})
+    def self.emoji_names(said)
+      found = []
+      walk = lambda do |node|
+        case node
+        when Hash
+          found << node["name"] if node["type"] == "emoji" && node["name"].present?
+          node["elements"]&.each { |one| walk.call(one) }
+        when Array then node.each { |one| walk.call(one) }
+        end
+      end
+      walk.call((said || {})["blocks"])
+      found.uniq
+    end
+
+    def initialize(names = {}, channels = {}, emoji = {})
       @names = names
       @channels = channels
+      @emoji = emoji
     end
 
     def said(message)
@@ -30,7 +45,7 @@ module Slack
 
     private
 
-    attr_reader :names, :channels
+    attr_reader :names, :channels, :emoji
 
     def block(one)
       case one["type"]
@@ -75,7 +90,7 @@ module Slack
       case one["type"]
       when "text" then lines(one["text"].to_s)
       when "link" then linked(one)
-      when "emoji" then tag.span(":#{one['name']}:", class: "rt-emoji", title: one["name"])
+      when "emoji" then emoji_for(one["name"])
       when "user" then chip(named(one["user_id"]), one["user_id"])
       when "usergroup" then chip("@#{one['usergroup_id']}", one["usergroup_id"])
       when "channel" then chip(roomed(one["channel_id"]), one["channel_id"])
@@ -121,6 +136,15 @@ module Slack
       tag.time(at.strftime("%-d %b %Y"), datetime: at.iso8601, class: "rt-date")
     rescue StandardError
       ERB::Util.html_escape(one["timestamp"].to_s)
+    end
+
+    def emoji_for(name)
+      said = ":#{name}:"
+      url = emoji[name].presence
+      return tag.span(said, class: "rt-emoji", title: name) if url.nil?
+
+      tag.img(src: url, class: "rt-emoji-img", alt: said, title: said, loading: "lazy",
+        width: 20, height: 20)
     end
 
     def chip(said, title)

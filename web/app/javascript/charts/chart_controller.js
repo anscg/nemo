@@ -16,8 +16,8 @@ const TILT = -32
 const LEAN = Math.abs(TILT) * Math.PI / 180
 const AX_LINE = 12
 const AX_MOST = 14
-const AX_SAY_X = 16
-const AX_SAY_Y = 14
+const AX_SAY_X = 26
+const AX_SAY_Y = 22
 
 const RULER = typeof document === "undefined"
   ? null
@@ -402,11 +402,11 @@ export default class extends Controller {
 
     const says = this.sparkValue ? "" : [
       this.xlabelValue
-        ? `<text class="ax" x="${((pad.l + right) / 2).toFixed(1)}" y="${high - 4}"
+        ? `<text class="ax" x="${((pad.l + right) / 2).toFixed(1)}" y="${high - 9}"
           text-anchor="middle">${esc(this.xlabelValue)}</text>`
         : "",
       this.ylabelValue
-        ? `<text class="ax" transform="translate(11 ${((pad.t + floor) / 2).toFixed(1)}) rotate(-90)"
+        ? `<text class="ax" transform="translate(15 ${((pad.t + floor) / 2).toFixed(1)}) rotate(-90)"
           text-anchor="middle">${esc(this.ylabelValue)}</text>`
         : ""
     ].join("")

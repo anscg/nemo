@@ -6,8 +6,10 @@ class MessageFilesTest < ActionDispatch::IntegrationTest
 
   SAID = {
     "text" => "look at this",
-    "files" => [{ "id" => FILE_ID, "name" => "shot.png", "mimetype" => "image/png" },
-                { "id" => "F2DOC", "name" => "notes.pdf", "mimetype" => "application/pdf" }]
+    "files" => [{ "id" => FILE_ID, "name" => "shot.png", "mimetype" => "image/png",
+                  "url_private" => "https://files.slack.com/files-pri/T1-F1/shot.png" },
+                { "id" => "F2DOC", "name" => "notes.pdf", "mimetype" => "application/pdf",
+                  "url_private" => "https://files.slack.com/files-pri/T1-F2/notes.pdf" }]
   }.freeze
 
   setup do
@@ -65,7 +67,8 @@ class MessageFilesTest < ActionDispatch::IntegrationTest
       assert_equal "image/png", response.media_type
       assert_match(/inline/, response.headers["Content-Disposition"])
       assert_match(/private/, response.headers["Cache-Control"])
-      assert_equal [["files.read", { "file" => FILE_ID }]], asked
+      assert_equal [["files.read",
+                     { "url" => "https://files.slack.com/files-pri/T1-F1/shot.png" }]], asked
     end
   end
 
@@ -73,7 +76,8 @@ class MessageFilesTest < ActionDispatch::IntegrationTest
     shown!
     sign_in_as(@me)
     said = SAID.merge("files" => [{ "id" => FILE_ID, "name" => "x.html",
-                                    "mimetype" => "text/html" }])
+                                    "mimetype" => "text/html",
+                                    "url_private" => "https://files.slack.com/x.html" }])
 
     answering(file: Slack::ProxyClient::Body.new(bytes: "<script>alert(1)</script>",
                                                  kind: "text/html"), said: said) do
@@ -90,7 +94,8 @@ class MessageFilesTest < ActionDispatch::IntegrationTest
     shown!
     sign_in_as(@me)
     said = SAID.merge("files" => [{ "id" => FILE_ID, "name" => "x.svg",
-                                    "mimetype" => "image/svg+xml" }])
+                                    "mimetype" => "image/svg+xml",
+                                    "url_private" => "https://files.slack.com/x.svg" }])
 
     answering(file: Slack::ProxyClient::Body.new(bytes: "<svg/>", kind: "image/svg+xml"),
               said: said) do

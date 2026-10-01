@@ -52,10 +52,19 @@ def test_a_file_url_must_be_slack_hosted():
     assert not file_client.hosted_by_slack("https://files.slack.com.evil.example/a.png")
 
 
-def test_a_file_with_no_id_is_refused():
+def test_a_file_url_elsewhere_is_refused():
     import pytest
 
     import file_client
 
-    with pytest.raises(file_client.FileError):
-        file_client.file_id_of({})
+    for said in ({}, {"url": "https://evil.example/a.png"},
+                 {"url": "http://files.slack.com/a.png"}):
+        with pytest.raises(file_client.FileError):
+            file_client.url_of(said)
+
+
+def test_a_slack_file_url_is_taken_as_it_stands():
+    import file_client
+
+    url = "https://files.slack.com/files-pri/T1-F1/image.png"
+    assert file_client.url_of({"url": url}) == url

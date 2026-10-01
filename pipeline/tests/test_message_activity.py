@@ -13,7 +13,6 @@ TS = "1790701062.123456"
 ME = "U0ME"
 THEM = "U0THEM"
 
-# a trimmed insights.messageStats answer: two hourly buckets, one minute bucket
 STATS = {
     "num_users_viewed": 224,
     "num_users_clicked": 58,
@@ -290,7 +289,6 @@ def test_the_new_capabilities_are_in_the_catalogue(key):
     assert key in capabilities.capabilities()
 
 
-# the chart: a png for the modal, drawn by hand
 
 def test_a_curve_renders_to_a_png_of_the_right_size():
     import io

@@ -1,5 +1,3 @@
-# one post, how it did. reached from nemo's "view message activity" modal, never
-# from a list: the author sees their own, nobody else sees anything
 class MessagesController < ApplicationController
   before_action { needs(:analytics) }
   before_action :require_reading
@@ -13,10 +11,15 @@ class MessagesController < ApplicationController
     return unless @post
 
     unless may_community?("analytics.message.read", @post)
-      return refuse_community("analytics.message.read")
+      return refuse_community("analytics.message.read", @post)
     end
 
-    @names = Fd::Names.for([@post.author_id])
+    @said = Slack::Message.at(@channel_id, @ts)
+    @names = Fd::Names.for([@post.author_id] + Fd::Mentions.ids(@said.said&.dig("text")))
+    @rooms = Analytics::DimChannel
+      .where(channel_id: Fd::Mentions.channel_ids(@said.said&.dig("text")))
+      .pluck(:channel_id, :name).to_h
+    @emoji = Slack::Emoji.for(Slack::RichText.emoji_names(@said.said))
     @crowd = Analytics::FctChannelSpan.where(channel_id: @channel_id).pick(:total_members)
     @span = Messages::Activity::SPANS.key?(params[:span]) ? params[:span] :
       Messages::Activity.span_for(@post.posted_at)

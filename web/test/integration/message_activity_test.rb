@@ -1,6 +1,5 @@
 require "test_helper"
 
-# one post, how it did: the author sees it in a channel that shows it, nobody else
 class MessageActivityTest < ActionDispatch::IntegrationTest
   STATS = {
     "ok" => true,
@@ -60,11 +59,12 @@ class MessageActivityTest < ActionDispatch::IntegrationTest
       get @path
 
       assert_response :success
-      assert_equal [["insights.messageStats", { "channel" => @post.channel_id, "ts" => @post.ts }]],
-        asked
+      assert_includes asked,
+        ["insights.messageStats", { "channel" => @post.channel_id, "ts" => @post.ts }]
+      assert_includes asked.map(&:first), "conversations.history"
     end
     assert_includes response.body, "224"
-    assert_includes response.body, "Viewers over the"
+    assert_includes response.body, "Reach over time"
     assert_includes response.body, "new viewers"
     assert_includes response.body, "browser"
   end
@@ -78,7 +78,7 @@ class MessageActivityTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_includes response.body, "Viewers over the first hour"
+    assert_match(/aria-current="true"[^>]*>First hour|First hour<\/a>/, response.body)
   end
 
   test "somebody else is turned away with nothing shown" do
@@ -112,8 +112,8 @@ class MessageActivityTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_includes response.body, "does not show how posts did"
-    refute_includes response.body, "Viewers over"
+    assert_includes response.body, "Activity is not shown for this channel"
+    refute_includes response.body, "Reach over time"
   end
 
   test "a post the warehouse has not landed says so without asking slack" do
@@ -125,7 +125,7 @@ class MessageActivityTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_includes response.body, "Not landed yet"
+    assert_includes response.body, "Post not in the warehouse yet"
   end
 
   test "when slack will not answer the page still stands" do
@@ -137,7 +137,7 @@ class MessageActivityTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :success
-    assert_includes response.body, "Slack would not say"
+    assert_includes response.body, "No activity returned"
   end
 
   test "a stranger is sent to the door" do

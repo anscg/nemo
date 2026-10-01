@@ -64,7 +64,6 @@ def may_see_channel(conn, user_id, channel_id):
 
 def may(conn, user_id, key, case_id=None):
     said = entry(conn, key)
-    # a capability every account holds needs no grant behind it
     if said["every_account"]:
         return in_scope(said)
     if not roles(conn, user_id) and not holds(conn, user_id, key):

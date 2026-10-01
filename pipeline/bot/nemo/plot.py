@@ -25,8 +25,6 @@ GRID = (230, 227, 221)
 LINE = (194, 94, 27)
 WASH = (194, 94, 27)
 
-# how each span is labelled along the bottom: the unit, the tick step and how
-# to say a tick. the curve's first point is the moment of posting
 SPANS = {
     "1h": ("minutes after posting", 60, 10, lambda m: f"{m}m"),
     "1d": ("hours after posting", 3600, 4, lambda h: f"{h}h"),
@@ -89,7 +87,6 @@ def smoothed(points, per_span=12):
             m[i] = 0.0
         else:
             m[i] = (slope[i - 1] + slope[i]) / 2
-    # fritsch-carlson keeps each segment monotone
     for i in range(n - 1):
         if slope[i] == 0:
             m[i] = m[i + 1] = 0.0
@@ -151,6 +148,17 @@ def so_far(curve, age_seconds):
     return [(at, count) for at, count in curve if (at - start).total_seconds() <= age_seconds]
 
 
+WINDOWS = ((86400, "day"), (3600, "hour"), (60, "minute"))
+
+
+def window_said(seconds):
+    for size, word in WINDOWS:
+        if seconds >= size:
+            count = round(seconds / size)
+            return f"the first {word}" if count == 1 else f"the first {count} {word}s"
+    return "the first minute"
+
+
 def render(curve, span, viewers=None, age_seconds=None):
     """PNG bytes for one span's curve of (posted_at + offset, new viewers), drawn
     up to the present only"""
@@ -208,14 +216,12 @@ def render(curve, span, viewers=None, age_seconds=None):
     draw.line([(left, floor), (right, floor)], fill=GRID, width=s)
     draw.line(bend, fill=LINE, width=int(3.2 * s), joint="curve")
 
-    # where the present falls, when the span runs past it
     if age_seconds is not None and age_seconds < whole_span:
         now_x = x_of(curve[-1][0])
         for y in range(int(top), int(floor), 8 * s):
             draw.line([(now_x, y), (now_x, min(y + 4 * s, floor))], fill=INK_4, width=s)
         draw.text((now_x + 8 * s, top + 2 * s), "now", font=small, fill=INK_4, anchor="la")
 
-    # the busiest moment gets a dot and its number
     i = counts.index(peak)
     px, py = points[i]
     draw.ellipse([px - 7 * s, py - 7 * s, px + 7 * s, py + 7 * s], fill=PAPER, outline=LINE,
@@ -227,9 +233,10 @@ def render(curve, span, viewers=None, age_seconds=None):
 
     title = font(SANS, 30, 620)
     sub = font(MONO, 16)
-    draw.text((left, 34 * s), f"Viewers over {TITLES[span]}", font=title, fill=INK, anchor="la")
-    seen = f"{viewers:,} people" if viewers is not None else f"{sum(counts):,} people"
-    draw.text((left, 74 * s), f"{seen} saw it · new viewers per {bucket_said(curve)}",
+    draw.text((left, 34 * s), f"Viewers over {window_said(whole_span)}", font=title, fill=INK,
+              anchor="la")
+    seen = f"{sum(counts):,} of {viewers:,}" if viewers is not None else f"{sum(counts):,}"
+    draw.text((left, 74 * s), f"{seen} viewers · new viewers per {bucket_said(curve)}",
               font=sub, fill=INK_2, anchor="la")
 
     shrunk = image.resize((WIDE, HIGH), Image.LANCZOS).filter(ImageFilter.SHARPEN)

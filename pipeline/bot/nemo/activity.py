@@ -15,8 +15,6 @@ SHOWN = """
 SELECT 1 FROM app.channel_message_activity WHERE channel_id = %s
 """
 
-# what the archive already holds about the post, replies most of all, since
-# slack's activity panel does not count them
 LANDED = """
 SELECT reply_count, reply_users_count, posted_at
 FROM archive.message

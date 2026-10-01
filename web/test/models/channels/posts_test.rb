@@ -53,7 +53,7 @@ class Channels::PostsTest < ActiveSupport::TestCase
     assert_not Channels::Posts.may_read?(Viewer.new("U1"), nil)
   end
 
-  Row = Struct.new(:channel_id, :ts, :posted_at, :reply_count, :reaction_count)
+  Row = Struct.new(:channel_id, :ts, :author_id, :posted_at, :reply_count, :reaction_count)
 
   def given(rows, answer)
     was = Channels::Posts.method(:rows)
@@ -67,7 +67,7 @@ class Channels::PostsTest < ActiveSupport::TestCase
   end
 
   def a_row(ts = "1790701062.123456")
-    Row.new("C1", ts, Time.current, 2, 5)
+    Row.new("C1", ts, "U1", Time.current, 2, 5)
   end
 
   test "what a post said is read back from slack, one post at a time" do
@@ -81,6 +81,7 @@ class Channels::PostsTest < ActiveSupport::TestCase
       assert_equal "big news", posts.sole.message["text"]
       assert_equal 2, posts.sole.replies
       assert_equal 5, posts.sole.reactions
+      assert_equal "U1", posts.sole.author_id
     end
   end
 

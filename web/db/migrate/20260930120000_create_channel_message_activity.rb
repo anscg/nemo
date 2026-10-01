@@ -1,5 +1,4 @@
 class CreateChannelMessageActivity < ActiveRecord::Migration[8.1]
-  # a row means an author may ask nemo how their own post in that channel did
   def change
     create_table :channel_message_activity, id: false do |t|
       t.string :channel_id, null: false, primary_key: true

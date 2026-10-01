@@ -1,6 +1,4 @@
 module Messages
-  # how one top-level post did, straight from slack's message activity, shaped
-  # for the page. the same numbers nemo shows in the modal
   class Activity
     METHOD = "insights.messageStats".freeze
     TTL = 1.minute
@@ -13,7 +11,6 @@ module Messages
     }.freeze
     DEFAULT_SPAN = "1d".freeze
 
-    # the unit each span is counted in, and how a tick reads
     UNITS = {
       "1h" => [60, ->(n) { "#{n}m" }],
       "1d" => [3600, ->(n) { "#{n}h" }],
@@ -21,7 +18,6 @@ module Messages
       "30d" => [86_400, ->(n) { "day #{n}" }]
     }.freeze
 
-    # what the x axis counts in, said the way the chart nemo draws says it
     AXIS = {
       "1h" => "minutes after posting",
       "1d" => "hours after posting",
@@ -70,7 +66,6 @@ module Messages
       @posted_at = posted_at
     end
 
-    # how far into the post's life we are, in seconds
     def age = @posted_at ? (Time.current - @posted_at).to_i : nil
 
     def viewers = @stats["num_users_viewed"].to_i
@@ -79,17 +74,16 @@ module Messages
     def shared = @stats["num_shares"].to_i
     def top_reply_ts = @stats["top_threaded_reply_by_reactions_ts"].presence
 
-    # [label, count, share of the whole in percent]
     def clients
       counts = CLIENTS.map { |key, label| [label, (@stats["client_breakdown"] || {})[key].to_i] }
       whole = counts.sum { |_, count| count }
       counts.map { |label, count| [label, count, whole.zero? ? nil : (100.0 * count / whole).round] }
     end
 
-    SPAN_SECONDS = { "1h" => 3600, "1d" => 86_400, "1w" => 7 * 86_400, "30d" => 30 * 86_400 }.freeze
+    DAILY = { "VIEWS" => "views", "CLICKS" => "clicks", "REACTIONS" => "reactions" }.freeze
 
-    # new unique viewers per bucket for one span, as [offset seconds, count].
-    # slack pads the span out with zeros past the present, so those are dropped
+    BUCKETS = [[3600, "hour"], [60, "minute"]].freeze
+
     def curve(span)
       series = ((@stats["viewers_time_series"] || {})["data"] || [])
         .find { |one| one["seriesType"] == span }
@@ -107,14 +101,39 @@ module Messages
         .reject { |offset, _| age && offset > age }
     end
 
-    # the span runs past the present, so the curve is only part of it
-    def partial?(span) = age.present? && age < SPAN_SECONDS.fetch(span)
+    def stamps(span)
+      series = ((@stats["viewers_time_series"] || {})["data"] || [])
+        .find { |one| one["seriesType"] == span }
+      (series && series["series"] || []).filter_map { |one| one["value"]&.to_i&./(1_000_000) }
+    end
+
+    def bucket_seconds(span)
+      held = stamps(span)
+      held.size > 1 ? held[1] - held[0] : nil
+    end
+
+    def window_seconds(span)
+      held = stamps(span)
+      held.size > 1 ? held.last - held.first : nil
+    end
+
+    def bucket_said(span)
+      seconds = bucket_seconds(span)
+      return nil if seconds.nil?
+
+      size, word = BUCKETS.find { |step, _| seconds >= step } || [1, "second"]
+      "#{(seconds.to_f / size).round}-#{word}"
+    end
+
+    def partial?(span)
+      whole = window_seconds(span)
+      age.present? && whole.present? && age < whole
+    end
 
     def seen_within(span) = curve(span).sum(&:last)
 
     def any_curve? = SPANS.keys.any? { |span| curve(span).size > 1 }
 
-    # what the chart controller draws: one line, ticks said in the span's unit
     def chart(span)
       unit, say = UNITS.fetch(span)
       points = curve(span)
@@ -126,6 +145,35 @@ module Messages
 
     def peak(span)
       curve(span).max_by(&:last)&.last.to_i
+    end
+
+    def daily
+      given = Array(@stats["activity_time_series"])
+      held = DAILY.keys.to_h do |key|
+        found = given.find { |one| one["seriesType"] == key }
+        [key, (found && found["series"] || [])]
+      end
+      stamps = held.values.max_by(&:size).to_a
+
+      stamps.each_with_index.map do |point, i|
+        [Time.zone.at(point["value"].to_i / 1_000_000).to_date,
+         DAILY.keys.map { |key| held[key][i] && held[key][i]["count"].to_i }]
+      end
+    end
+
+    def daily?
+      rows = daily
+      rows.size > 1 && rows.sum { |_, counts| counts.compact.sum }.positive?
+    end
+
+    def daily_chart
+      rows = daily
+      {
+        labels: rows.map { |day, _| day.iso8601 },
+        datasets: DAILY.values.each_with_index.map do |label, i|
+          { label: label, data: rows.map { |_, counts| counts[i] } }
+        end
+      }
     end
   end
 end

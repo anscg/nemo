@@ -1,8 +1,7 @@
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
-
-from slack_client import admin_token
 
 READ = "files.read"
 METHODS = frozenset({READ})
@@ -17,10 +16,10 @@ class FileError(RuntimeError):
     """Slack would not hand over the file"""
 
 
-def file_id_of(params):
-    said = str(params.get("file") or "").strip()
+def cookie():
+    said = os.environ.get("SLACK_D_COOKIE", "").strip()
     if not said:
-        raise FileError("file is required")
+        raise FileError("SLACK_D_COOKIE must be set to read a file")
     return said
 
 
@@ -29,13 +28,20 @@ def hosted_by_slack(url):
     return any(host == one.lstrip(".") or host.endswith(one) for one in SLACK_HOSTS)
 
 
-def bytes_of(url, token):
-    if not url:
-        raise FileError("the file has no private url")
-    if not hosted_by_slack(url):
+def url_of(params):
+    said = str(params.get("url") or "").strip()
+    if not said:
+        raise FileError("url is required")
+    if not said.startswith("https://"):
+        raise FileError("the file url must be https")
+    if not hosted_by_slack(said):
         raise FileError("the file is not hosted by slack")
+    return said
 
-    asked = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+
+def read(params):
+    url = url_of(params)
+    asked = urllib.request.Request(url, headers={"Cookie": f"d={cookie()}"})
     try:
         with urllib.request.urlopen(asked, timeout=UPSTREAM_TIMEOUT) as answer:
             body = answer.read(MOST_BYTES + 1)
@@ -50,10 +56,3 @@ def bytes_of(url, token):
     if kind.startswith("text/html"):
         raise FileError("slack answered with a sign-in page, not the file")
     return body, kind
-
-
-def read(params, info):
-    file_id = file_id_of(params)
-    found = (info(file_id) or {}).get("file") or {}
-    body, kind = bytes_of(found.get("url_private"), admin_token())
-    return body, found.get("mimetype") or kind

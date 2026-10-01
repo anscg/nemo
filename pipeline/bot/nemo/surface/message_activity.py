@@ -70,8 +70,6 @@ def asked(ctx):
         found = activity.landed(conn, ctx.channel_id, ts)
         crowd = activity.members(conn, ctx.channel_id)
 
-    # the trigger dies three seconds after the click, so the modal opens
-    # before slack is asked and fills in once it answers
     opened = ctx.client.views_open(trigger_id=ctx.trigger_id, view=card.reading())
     view_id = ((opened or {}).get("view") or {}).get("id")
 

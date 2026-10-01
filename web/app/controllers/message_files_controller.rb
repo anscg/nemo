@@ -16,7 +16,7 @@ class MessageFilesController < ApplicationController
 
     said = Slack::Message.at(channel_id, ts)
     one = Messages::File.in(said.said, params[:file_id])
-    return head :not_found if one.nil?
+    return head :not_found if one.nil? || one["url_private"].blank?
 
     hand_over(one)
   end
