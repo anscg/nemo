@@ -76,13 +76,13 @@ WRITE_METHODS = {
     ),
 }
 
-# how one post did: viewers, clicks, reactions and the curves behind slack's
-# own message activity panel. a read, kept apart from the writes so it is
-# never logged as one
 ACTIVITY_METHODS = {"internal": frozenset({"insights.messageStats"})}
+
+HISTORY_METHODS = {"admin": frozenset({"conversations.history"})}
 
 NEMO_METHODS = {**WRITE_METHODS, **ACTIVITY_METHODS}
 WEB_METHODS["internal"] = WEB_METHODS["internal"] | ACTIVITY_METHODS["internal"]
+WEB_METHODS["admin"] = HISTORY_METHODS["admin"]
 
 CREDENTIALS = ("internal", "admin")
 
