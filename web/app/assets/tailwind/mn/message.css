@@ -2,12 +2,6 @@
   .ma-post { padding: var(--s-sm); max-width: 78ch; }
   .ma-post-head { display: flex; align-items: center; gap: var(--s-2xs); flex-wrap: wrap; }
   .ma-face { width: 26px; height: 26px; border-radius: 50%; }
-  .ma-post-open {
-    margin-left: auto;
-    font-size: var(--t-mark);
-    color: var(--ink-4);
-  }
-  .ma-post-open:hover { color: var(--accent); }
   .ma-post-said { margin-top: var(--s-2xs); }
   .ma-post-said > .rt-said:first-child { margin-top: 0; }
 

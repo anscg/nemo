@@ -44,8 +44,6 @@
         <span class="msg-at">
           <%= @post.posted_at.in_time_zone(viewer_zone).strftime("%-d %b %Y, %H:%M") %>
         </span>
-        <%= link_to "Open in Slack", Fd::SlackLink.url_for(@channel_id, @ts),
-              class: "ma-post-open", target: "_blank", rel: "noopener" %>
       </header>
 
       <div class="ma-post-said">
