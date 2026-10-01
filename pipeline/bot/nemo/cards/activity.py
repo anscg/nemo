@@ -136,18 +136,6 @@ def view(channel_id, ts, author_id, text, stats, found=None, crowd=None,
     if buttons:
         blocks.append({"type": "actions", "elements": buttons})
 
-    blocks.append(
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "mrkdwn",
-                    "text": "Unique people, counted by Slack. Views are not read receipts.",
-                }
-            ],
-        }
-    )
-
     return {
         "type": "modal",
         "title": {"type": "plain_text", "text": TITLE},
