@@ -1,4 +1,4 @@
-# one post, how it did. reached from nemo's "how did this do?" modal, never
+# one post, how it did. reached from nemo's "view message activity" modal, never
 # from a list: the author sees their own, nobody else sees anything
 class MessagesController < ApplicationController
   before_action { needs(:analytics) }

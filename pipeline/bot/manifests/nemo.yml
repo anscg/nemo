@@ -16,7 +16,7 @@ features:
       type: message
       callback_id: lock_thread
       description: Stop new replies until the lock lifts
-    - name: How did this do?
+    - name: View message activity
       type: message
       callback_id: message_activity
       description: Viewers, reactions and clicks on your own post

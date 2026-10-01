@@ -1,6 +1,6 @@
-"""The modal behind "how did this do?": one post, its numbers, a way to the chart"""
+"""The modal behind "view message activity": one post, its numbers, a way to the chart"""
 
-TITLE = "How did this do?"
+TITLE = "View message activity"
 OPEN_ACTIVITY = "open_message_activity"
 OPEN_TOP_REPLY = "open_top_reply"
 
