@@ -42,6 +42,8 @@ HOLDING = (
     (
         ("member.guard", "/nemo shush @somebody 3d why",
          "a shush with no case behind it, until that date"),
+        ("member.guard", "/nemo channelban @somebody #channel 3d why",
+         "a channel ban with no case behind it, until that date"),
     ),
 )
 

@@ -14,12 +14,14 @@ LOOKUP = "lookup"
 NOTE = "note"
 OPEN = "open"
 SHUSH = "shush"
+CHANNEL_BAN = "channelban"
 OPEN_RECORD = "open_record"
 
-ABOUT_SOMEBODY = (LOOKUP, NOTE, OPEN, SHUSH)
-NEEDS_WORDS = (NOTE, OPEN, SHUSH)
+ABOUT_SOMEBODY = (LOOKUP, NOTE, OPEN, SHUSH, CHANNEL_BAN)
+NEEDS_WORDS = (NOTE, OPEN, SHUSH, CHANNEL_BAN)
 
 WHO = re.compile(r"<@([UW][A-Z0-9]+)(?:\|[^>]*)?>")
+WHERE = re.compile(r"<#(C[A-Z0-9]+)(?:\|[^>]*)?>")
 CASE = re.compile(r"\A#?(\d+)\Z")
 MEMBER_ID = re.compile(r"\A[UW][A-Z0-9]{2,}\Z")
 FOR_A_WHILE = re.compile(r"\A(\d{1,3})([dw])\Z", re.IGNORECASE)
@@ -32,18 +34,27 @@ ASK_FOR_SOMEBODY = {
     NOTE: "Name somebody: */nemo note @them what you found*",
     OPEN: "Name somebody: */nemo open @them what happened*",
     SHUSH: "Name somebody: */nemo shush @them 3d why*",
+    CHANNEL_BAN: "Name somebody: */nemo channelban @them #channel 3d why*",
 }
 
 ASK_FOR_WORDS = {
     NOTE: "Say what you found: */nemo note @them what you found*",
     OPEN: "Say what happened: */nemo open @them what happened*",
     SHUSH: "Say how long and why: */nemo shush @them 3d why*",
+    CHANNEL_BAN: "Say how long and why: */nemo channelban @them #channel 3d why*",
 }
 
-ASK_FOR_TIME = (
-    "Say how long it runs first: */nemo shush @them 3d why*. "
+HOW_LONG = (
+    "Say how long it runs first: *{said}*. "
     f"Days or weeks, up to {LONGEST_DAYS} days, or a date like 2026-10-15."
 )
+
+ASK_FOR_TIME = {
+    SHUSH: HOW_LONG.format(said="/nemo shush @them 3d why"),
+    CHANNEL_BAN: HOW_LONG.format(said="/nemo channelban @them #channel 3d why"),
+}
+
+ASK_FOR_CHANNEL = "Name the channel: */nemo channelban @them #channel 3d why*"
 
 
 def asked(text):
@@ -94,6 +105,15 @@ def for_how_long(body):
     if on is None:
         return None, None
     return on, re.sub(r"\s+", " ", rest).strip() or None
+
+
+def in_a_channel(body):
+    found = WHERE.search(body or "")
+    if not found:
+        return None, None
+
+    said = body[: found.start()] + " " + body[found.end() :]
+    return found.group(1), re.sub(r"\s+", " ", said).strip() or None
 
 
 def said_only(text):
@@ -179,6 +199,7 @@ NEEDED = {
     NOTE: "member.note",
     OPEN: "case.open",
     SHUSH: "member.guard",
+    CHANNEL_BAN: "member.guard",
     "case": "case.read",
 }
 
@@ -201,6 +222,21 @@ def shushed(user_id, on):
 def already_shushed(user_id):
     return (
         f"<@{user_id}> is already under a shush. "
+        "Lift it or run it longer in Fire Engine."
+    )
+
+
+def banned(user_id, channel_id, on):
+    return (
+        f"channel ban held on <@{user_id}> in <#{channel_id}> "
+        f"until {on.strftime('%-d %b')}, on no case. "
+        "Log it on a case if there is one."
+    )
+
+
+def already_banned(user_id, channel_id):
+    return (
+        f"<@{user_id}> is already banned from <#{channel_id}>. "
         "Lift it or run it longer in Fire Engine."
     )
 
@@ -254,7 +290,7 @@ def register(app):
             elif verb == SHUSH:
                 on, why = for_how_long(body)
                 if on is None:
-                    answer = said_only(ASK_FOR_TIME)
+                    answer = said_only(ASK_FOR_TIME[SHUSH])
                 elif not why:
                     answer = said_only(ASK_FOR_WORDS[SHUSH])
                 else:
@@ -264,6 +300,24 @@ def register(app):
                     )
                     answer = said_only(
                         shushed(wanted, on) if guard_id else already_shushed(wanted)
+                    )
+            elif verb == CHANNEL_BAN:
+                where, rest = in_a_channel(body)
+                on, why = for_how_long(rest)
+                if where is None:
+                    answer = said_only(ASK_FOR_CHANNEL)
+                elif on is None:
+                    answer = said_only(ASK_FOR_TIME[CHANNEL_BAN])
+                elif not why:
+                    answer = said_only(ASK_FOR_WORDS[CHANNEL_BAN])
+                else:
+                    guard_id = memberguards.open_guard(
+                        conn, memberguards.CHANNEL_BAN, wanted, user_id, why,
+                        channel_id=where, expires_at=f"{on} 23:59:59",
+                    )
+                    answer = said_only(
+                        banned(wanted, where, on) if guard_id
+                        else already_banned(wanted, where)
                     )
             elif verb == OPEN:
                 held = casework.open_about(conn, wanted)
