@@ -33,3 +33,29 @@ def test_the_bot_does_not_get_to_read_history_for_free():
 
 def test_the_web_still_holds_no_writes():
     assert not app.WEB_METHODS["admin"] & app.WRITES
+
+
+def test_the_web_may_read_a_file_and_nobody_else():
+    assert "files.read" in app.WEB_FILE_METHODS
+    assert "files.read" not in app.ALLOWED_FILE_METHODS
+
+
+def test_reading_a_file_is_never_logged_as_a_write():
+    assert "files.read" not in app.WRITES
+
+
+def test_a_file_url_must_be_slack_hosted():
+    import file_client
+
+    assert file_client.hosted_by_slack("https://files.slack.com/files-pri/T1-F1/a.png")
+    assert not file_client.hosted_by_slack("https://evil.example/a.png")
+    assert not file_client.hosted_by_slack("https://files.slack.com.evil.example/a.png")
+
+
+def test_a_file_with_no_id_is_refused():
+    import pytest
+
+    import file_client
+
+    with pytest.raises(file_client.FileError):
+        file_client.file_id_of({})

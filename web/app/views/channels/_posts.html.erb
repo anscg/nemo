@@ -15,6 +15,19 @@
           <% else %>
             <p class="msg-gone">Slack would not answer for this one.</p>
           <% end %>
+
+          <% if post.files.any? %>
+            <div class="post-files">
+              <% post.files.each do |one| %>
+                <% url = message_file_path(post.channel_id, post.ts, one["id"]) %>
+                <% if Messages::File.image?(one) %>
+                  <%= image_tag url, alt: one["name"].to_s, class: "post-image", loading: "lazy" %>
+                <% else %>
+                  <%= link_to one["name"].presence || one["id"], url, class: "post-file" %>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
           <p class="member-event-by">
             <%= pluralize(post.reactions, "reaction") %>
             <span class="triad-sep">&middot;</span>

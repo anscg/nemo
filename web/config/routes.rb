@@ -17,6 +17,10 @@ Rails.application.routes.draw do
   get "messages/:channel_id/:ts", to: "messages#show", as: :message_activity,
       constraints: { channel_id: /[CDG][A-Z0-9]+/, ts: /\d+\.\d+/ }, format: false
 
+  get "messages/:channel_id/:ts/files/:file_id", to: "message_files#show", as: :message_file,
+      constraints: { channel_id: /[CDG][A-Z0-9]+/, ts: /\d+\.\d+/, file_id: /[A-Z0-9]+/ },
+      format: false
+
   namespace :fd do
     root to: "fire#show"
     post "cases/merge", to: "merges#create", as: :merge_cases

@@ -6,6 +6,7 @@ module Channels
       keyword_init: true) do
       def error = said&.error
       def message = said&.said
+      def files = Messages::File.listed(message)
     end
 
     def self.may_read?(viewer, subject_id)

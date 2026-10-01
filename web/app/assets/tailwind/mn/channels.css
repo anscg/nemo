@@ -48,4 +48,19 @@
   .rt-link { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
   .rt-emoji { color: var(--ink-3); }
   .rt-rule { margin: var(--s-xs) 0; border: 0; border-top: 1px solid var(--line-soft); }
+
+  .post-files { display: flex; flex-wrap: wrap; gap: var(--s-2xs); margin-top: var(--s-2xs); }
+  .post-image {
+    max-width: min(100%, 360px);
+    max-height: 240px;
+    border-radius: var(--r-ctl);
+    border: 1px solid var(--line-soft);
+  }
+  .post-file {
+    padding: 2px 8px;
+    border-radius: var(--r-ctl);
+    border: 1px solid var(--line-soft);
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
 }
