@@ -203,19 +203,13 @@ def lift_lock(client, guard_id):
         guard = guards.by_id(conn, guard_id)
         if guard is None:
             return None
-        gid, kind, channel_id, thread_ts, state, _by, _warned, _expires = guard
+        gid, kind, channel_id, _thread_ts, state, _by, _warned, _expires = guard
         if kind != guards.LOCK or state not in ("warned", "running"):
             return None
         guards.finish(conn, gid, "done")
         guards.refresh(conn)
 
-    try:
-        client.chat_postMessage(
-            channel=channel_id, thread_ts=thread_ts,
-            text=":unlock: This thread is open again.", unfurl_links=False,
-        )
-    except Exception as failure:
-        log.warning("nemo: guard %s lifted but could not say so: %s", gid, failure)
+    log.info("nemo: guard %s lifted the lock on %s", gid, channel_id)
     return gid
 
 
