@@ -1,7 +1,7 @@
 module Analytics
   class FctMessage < ApplicationRecord
     self.table_name = "analytics.fct_message"
-    self.primary_key = nil
+    self.primary_key = [:channel_id, :ts]
 
     def readonly?
       true
