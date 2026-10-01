@@ -21,6 +21,16 @@ module Messages
       "30d" => [86_400, ->(n) { "day #{n}" }]
     }.freeze
 
+    # what the x axis counts in, said the way the chart nemo draws says it
+    AXIS = {
+      "1h" => "minutes after posting",
+      "1d" => "hours after posting",
+      "1w" => "days after posting",
+      "30d" => "days after posting"
+    }.freeze
+
+    VIEWERS = "new viewers".freeze
+
     CLIENTS = [["browser_count", "browser"], ["desktop_count", "desktop"],
                ["mobile_count", "mobile"]].freeze
 
@@ -43,6 +53,8 @@ module Messages
     rescue Slack::ProxyClient::Error
       Result.new(error: :unavailable)
     end
+
+    def self.x_label(span) = AXIS.fetch(span, AXIS[DEFAULT_SPAN])
 
     def self.span_for(posted_at)
       age = Time.current - posted_at

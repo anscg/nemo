@@ -71,7 +71,7 @@
             <% if share %>
               <%= number_to_percentage(share, precision: 0) %> of the channel
             <% else %>
-              unique people, counted by Slack
+              unique people
             <% end %>
           </span>
         </div>
@@ -133,8 +133,9 @@
              data-chart-kind-value="line"
              data-chart-height-value="260"
              data-chart-nokey-value="true"
+             data-chart-xlabel-value="<%= Messages::Activity.x_label(@span) %>"
+             data-chart-ylabel-value="<%= Messages::Activity::VIEWERS %>"
              data-chart-data-value="<%= stats.chart(@span).to_json %>"></div>
-        <p class="chart-note">new unique viewers per bucket, counted from the moment of posting</p>
       </div>
 
       <div class="card card-flush">
